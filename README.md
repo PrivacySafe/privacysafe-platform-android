@@ -1,2 +1,2 @@
 # privacysafe-platform-android
-Privacysafe platform on Android
+PrivacySafe platform on Android

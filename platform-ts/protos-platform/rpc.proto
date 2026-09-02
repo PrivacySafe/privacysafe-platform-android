@@ -1,0 +1,102 @@
+syntax = "proto3";
+
+import "common.proto";
+import "file.proto";
+import "fs.proto";
+
+package rpc;
+
+
+// ==== appRPC capability ====
+// Reply body is common.ObjectReference's of RPCConnection's.
+message AppRPCRequestBody {
+	string service = 1;
+}
+
+
+// ==== otherAppsRPC capability ====
+// Reply body is common.ObjectReference's of RPCConnection's.
+message OtherAppsRPCRequestBody {
+	string app_domain = 1;
+	string service = 2;
+}
+
+
+// ==== allocateProxyFor capability ====
+// Reply body is common.ObjectReference's of an allocated proxy.
+message AllocateProxyRequestBody {
+	message Member {
+		bool is_obj = 1;
+		string name = 2;
+		repeated Member members = 3;
+	}
+	uint32 obj_ref = 1;
+	repeated Member members = 2;
+}
+
+
+// ==== RPCConnection referable object ====
+
+// --- RPCConnection.makeRequestReplyCall ---
+// Request body is CallStartRequestBody.
+// Reply body is PassedDatum.
+
+// --- RPCConnection.startObservableCall ---
+// Its an observable call.
+// Request body is CallStartRequestBody.
+// Intermediate values are PassedDatum's.
+
+
+message CallStartRequestBody {
+	string method = 1;
+	PassedDatum req = 2;
+}
+
+message PassedDatum {
+	message PassedObj {
+		common.ObjectReference ref = 1;
+		fs.FS fs = 2;
+		file.File file = 3;
+	}
+	bytes bytes = 1;
+	repeated PassedObj passed_objs = 2;
+}
+
+
+// ==== exposeService capability ====
+// Its an observable call.
+// Intermediate values are common.ObjectReference's of IncomingConnection's.
+message ExposeSrvRequestBody {
+	string service = 1;
+}
+
+
+// ==== IncomingConnection referable object ====
+
+// --- IncomingConnection.close ---
+// Request body is empty.
+// Reply body is empty
+
+// --- IncomingConnection.send ---
+// Request body is OutgoingMsg.
+// Reply body is empty
+
+// --- IncomingConnection.watch ---
+// Its an observable call.
+// Request body is empty.
+// Intermediate values are OutgoingMsg.
+
+
+message IncomingMsg {
+	string msg_type = 1;
+	uint32 call_num = 2;
+	string method = 3;
+	PassedDatum data = 4;
+}
+
+message OutgoingMsg {
+	uint32 call_num = 1;
+	string call_status = 2;
+	PassedDatum data = 3;
+	common.ErrorValue err = 4;
+}

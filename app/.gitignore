@@ -1,0 +1,7 @@
+/build
+/src/main/assets/bundled-apps/*
+/src/main/assets/bundled-app-packs/*
+/src/main/assets/scripts-webview/*
+/src/main/assets/scripts-jsengine/*
+/env-path-addition
+*.jks

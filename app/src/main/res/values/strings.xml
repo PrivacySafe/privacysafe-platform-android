@@ -1,0 +1,13 @@
+<resources>
+	<string name="app_name">PrivacySafe</string>
+	<string name="core_runner_channel">PrivacySafe</string>
+	<string name="core_runner_channel_description">PrivacySafe process for logged user</string>
+
+	<string name="startup_app_name">PrivacySafe Login</string>
+	<string name="dashboard_app_name">Dashboard</string>
+	<string name="chat_app_name">Chat</string>
+	<string name="contacts_app_name">Contacts</string>
+	<string name="storage_app_name">Storage</string>
+	<string name="inbox_app_name">Inbox</string>
+	<string name="treasure_app_name">Treasure</string>
+</resources>

@@ -1,0 +1,102 @@
+syntax = "proto2";
+
+package fs_op;
+
+message CopyFileArgs {
+	required string src = 1;
+	required string dst = 2;
+	required bool overwrite = 3;
+}
+
+message Stats {
+  required bool is_file = 1;
+  required bool is_directory = 2;
+  required bool is_symbolic_link = 3;
+  required int64 birthtime_ms = 4;
+  required int64 mtime_ms = 5;
+  required int64 atime_ms = 6;
+  required int64 size = 7;
+  required int64 blocks = 8;
+  required int32 blksize = 9;
+}
+
+message PathArgs {
+	required string path = 1;
+}
+
+message AppendFileArgs {
+	required string path = 1;
+	required bytes chunk = 2;
+}
+
+message WriteFileArgs {
+  required string path = 1;
+  required string write_flag = 2;
+  required bytes content = 3;
+}
+
+message DirRecursiveArgs {
+  required string path = 1;
+  required bool recursive = 2;
+}
+
+message OpenFileArgs {
+  required string path = 1;
+  required string open_flag = 2;
+}
+
+message TruncateFileArgs {
+  required string path = 1;
+  required int64 len = 2;
+}
+
+message SymLinkCreateArgs {
+  required string path = 1;
+  required string target = 2;
+}
+
+message RenameArgs {
+  required string old_path = 1;
+  required string new_path = 2;
+}
+
+message FdArgs {
+  required int32 fd = 1;
+}
+
+message ReadFdPosArg {
+  required int32 fd = 1;
+  required int64 read_pos = 2;
+  required int32 len = 3;
+}
+
+message WriteAtFdPosArgs {
+  required int32 fd = 1;
+  optional int64 write_pos = 2;
+  required bytes chunk = 3;
+}
+
+message FdTruncateArgs {
+  required int32 fd = 1;
+  required int64 len = 2;
+}
+
+message AssetsPathArgs {
+  required bool from_packs = 1;
+  required string path = 2;
+}
+
+message ReadFromAssetsPathArgs {
+  required bool from_packs = 1;
+  required string path = 2;
+  optional int64 start = 3;
+  optional int64 end = 4;
+}
+
+message AssetsFolderListing {
+  message AssetFolderItem {
+    required string name = 1;
+    required bool is_folder = 2;
+  }
+  repeated AssetFolderItem items = 1;
+}

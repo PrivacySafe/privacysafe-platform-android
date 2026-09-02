@@ -1,0 +1,25 @@
+syntax = "proto3";
+
+import "common.proto";
+
+package test_stand;
+
+// ==== testStand capability ====
+
+// --- sendMsgToOtherLocalTestProcess ---
+// Reply body is empty
+message SendMsgToOtherLocalTestProcessRequestBody {
+	common.UInt32Value user_num = 1;
+	common.StringValue app_domain = 2;
+	common.StringValue app_component = 3;
+	string msg_json = 4;
+}
+
+// --- observeMsgsFromOtherLocalTestProcess ---
+// Its an observable call.
+// Intermediate values are common.StringValue's with json values.
+message ObserveOtherTestProcessRequestBody {
+	common.UInt32Value user_num = 1;
+	common.StringValue app_domain = 2;
+	common.StringValue app_component = 3;
+}

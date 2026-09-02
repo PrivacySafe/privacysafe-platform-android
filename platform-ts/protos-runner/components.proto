@@ -1,0 +1,39 @@
+syntax = "proto2";
+
+package components;
+
+message ConnectorIdArgs {
+	required string connector_id = 1;
+}
+
+message ConnectorAndPathArgs {
+	required string connector_id = 1;
+	required string path = 2;
+}
+
+message FileReadArgs {
+	required string connector_id = 1;
+	required string path = 2;
+	optional int32 start = 3;
+	optional int32 end = 4;
+}
+
+message ComponentEntrypointArgs {
+	required string connector_id = 1;
+	required string app_domain = 2;
+	required string entrypoint = 3;
+}
+
+message SystemErrBoxArgs {
+	required string title = 1;
+	required string content = 2;
+}
+
+message ConnectorAndEntrypoint {
+	required string connector_id = 1;
+	required string entrypoint = 2;
+}
+
+message AppDomainArgs {
+	required string app_domain = 1;
+}

@@ -1,0 +1,7 @@
+syntax = "proto2";
+
+package random_op;
+
+message NumOfBytesArgs {
+	required int32 num_of_bytes = 1;
+}

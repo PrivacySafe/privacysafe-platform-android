@@ -1,0 +1,320 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+	xmlns:tools="http://schemas.android.com/tools">
+
+	<uses-feature android:name="android.hardware.camera" android:required="false" />
+	<uses-feature android:name="android.hardware.camera.autofocus" android:required="false" />
+
+	<uses-permission android:name="android.permission.ACCESS_NOTIFICATION_POLICY" />
+	<uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+	<uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+	<uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC" />
+	<uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
+
+	<uses-permission android:name="android.permission.INTERNET" />
+	<uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+
+	<uses-permission android:name="android.permission.CAMERA" />
+	<uses-permission android:name="android.permission.RECORD_AUDIO" />
+	<uses-permission android:name="android.permission.MODIFY_AUDIO_SETTINGS" />
+	<uses-permission android:name="android.permission.VIDEO_CAPTURE" />
+	<uses-permission android:name="android.permission.AUDIO_CAPTURE" />
+	<uses-permission android:name="android.webkit.resource.AUDIO_CAPTURE" />
+	<uses-permission android:name="android.webkit.resource.VIDEO_CAPTURE" />
+
+<!--	<uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" />-->
+<!--	<uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" android:maxSdkVersion="28" />-->
+<!--	<uses-permission android:name="android.permission.READ_MEDIA_AUDIO" />-->
+<!--	<uses-permission android:name="android.permission.READ_MEDIA_VIDEO" />-->
+<!--	<uses-permission android:name="android.permission.READ_MEDIA_IMAGES" />-->
+<!--	<uses-permission android:name="android.permission.MANAGE_EXTERNAL_STORAGE" />-->
+
+	<application
+		android:allowBackup="false"
+		android:fullBackupContent="false"
+		android:dataExtractionRules="@xml/data_extraction_rules"
+		android:appCategory="productivity"
+		android:icon="@drawable/app_logo_bg"
+		android:roundIcon="@drawable/app_logo_bg"
+		android:label="@string/app_name"
+		android:largeHeap="true"
+		android:supportsRtl="true"
+		android:theme="@style/Theme.PrivacySafe"
+		android:allowTaskReparenting="true"
+		android:resizeableActivity="true"
+	>
+
+		<receiver
+			android:name=".InitOnBoot"
+			android:enabled="true"
+			android:exported="true">
+			<intent-filter>
+				<action android:name="android.intent.action.BOOT_COMPLETED" />
+			</intent-filter>
+		</receiver>
+
+		<service
+			android:name=".CoreRunnerService"
+			android:enabled="true"
+			android:exported="false"
+			android:foregroundServiceType="dataSync" />
+
+		<activity
+			android:name=".InitActivity"
+			android:exported="true"
+			android:configChanges="touchscreen|keyboard|keyboardHidden|orientation|screenLayout|screenSize"
+			android:resizeableActivity="true"
+			android:supportsPictureInPicture="true"
+			android:theme="@style/Theme.PrivacySafe">
+			<intent-filter>
+				<action android:name="android.intent.action.MAIN" />
+				<category android:name="android.intent.category.LAUNCHER" />
+			</intent-filter>
+			<intent-filter>
+				<action android:name="android.intent.action.BOOT_COMPLETED" />
+			</intent-filter>
+			<intent-filter>
+				<action android:name="android.intent.action.VIEW" />
+				<category android:name="android.intent.category.DEFAULT" />
+				<category android:name="android.intent.category.BROWSABLE" />
+				<data android:scheme="w3n" />
+			</intent-filter>
+		</activity>
+
+		<activity
+			android:name=".SystemDialogActivity"
+			android:exported="false"
+			android:noHistory="true"
+			android:configChanges="touchscreen|keyboard|keyboardHidden|orientation|screenLayout|screenSize"
+			android:resizeableActivity="true"
+			android:supportsPictureInPicture="true"
+			android:theme="@style/Theme.PrivacySafe"/>
+
+		<activity
+			android:name=".QRScannerActivity"
+			android:exported="false"
+			android:noHistory="true"
+			android:configChanges="touchscreen|keyboard|keyboardHidden|orientation|screenLayout|screenSize"
+			android:resizeableActivity="true"
+			android:supportsPictureInPicture="true"
+			android:theme="@style/Theme.PrivacySafe"/>
+
+		<activity
+			android:name=".StartupAppActivity"
+			android:label="@string/startup_app_name"
+			android:exported="false"
+			android:configChanges="touchscreen|keyboard|keyboardHidden|orientation|screenLayout|screenSize"
+			android:resizeableActivity="true"
+			android:supportsPictureInPicture="true"
+			android:theme="@style/Theme.PrivacySafe">
+			<intent-filter>
+				<action android:name="android.intent.action.MAIN" />
+			</intent-filter>
+		</activity>
+
+		<activity
+			android:name=".DashboardAppActivity"
+			android:label="@string/dashboard_app_name"
+			android:exported="false"
+			android:configChanges="touchscreen|keyboard|keyboardHidden|orientation|screenLayout|screenSize"
+			android:resizeableActivity="true"
+			android:supportsPictureInPicture="true"
+			android:theme="@style/Theme.PrivacySafe">
+			<intent-filter>
+				<action android:name="android.intent.action.MAIN" />
+			</intent-filter>
+		</activity>
+
+		<activity
+			android:name=".ContactsAppActivity"
+			android:label="@string/contacts_app_name"
+			android:icon="@drawable/contacts_app_logo"
+			android:exported="false"
+			android:configChanges="touchscreen|keyboard|keyboardHidden|orientation|screenLayout|screenSize"
+			android:resizeableActivity="true"
+			android:supportsPictureInPicture="true"
+			android:theme="@style/Theme.PrivacySafe">
+			<intent-filter>
+				<action android:name="android.intent.action.MAIN" />
+			</intent-filter>
+		</activity>
+
+		<activity
+			android:name=".InboxAppActivity"
+			android:label="@string/inbox_app_name"
+			android:icon="@drawable/inbox_app_logo"
+			android:exported="false"
+			android:configChanges="touchscreen|keyboard|keyboardHidden|orientation|screenLayout|screenSize"
+			android:resizeableActivity="true"
+			android:supportsPictureInPicture="true"
+			android:theme="@style/Theme.PrivacySafe">
+			<intent-filter>
+				<action android:name="android.intent.action.MAIN" />
+			</intent-filter>
+		</activity>
+
+		<activity
+			android:name=".ChatAppActivity"
+			android:label="@string/chat_app_name"
+			android:icon="@drawable/chat_app_logo"
+			android:exported="false"
+			android:configChanges="touchscreen|keyboard|keyboardHidden|orientation|screenLayout|screenSize"
+			android:resizeableActivity="true"
+			android:supportsPictureInPicture="true"
+			android:theme="@style/Theme.PrivacySafe">
+			<intent-filter>
+				<action android:name="android.intent.action.MAIN" />
+			</intent-filter>
+		</activity>
+
+		<activity
+			android:name=".StorageAppActivity"
+			android:label="@string/storage_app_name"
+			android:icon="@drawable/storage_app_logo"
+			android:exported="false"
+			android:configChanges="touchscreen|keyboard|keyboardHidden|orientation|screenLayout|screenSize"
+			android:resizeableActivity="true"
+			android:supportsPictureInPicture="true"
+			android:theme="@style/Theme.PrivacySafe">
+			<intent-filter>
+				<action android:name="android.intent.action.MAIN" />
+			</intent-filter>
+		</activity>
+
+		<activity
+			android:name=".TreasureAppActivity"
+			android:label="@string/treasure_app_name"
+			android:icon="@drawable/treasure_app_logo"
+			android:exported="false"
+			android:configChanges="touchscreen|keyboard|keyboardHidden|orientation|screenLayout|screenSize"
+			android:resizeableActivity="true"
+			android:supportsPictureInPicture="true"
+			android:theme="@style/Theme.PrivacySafe">
+			<intent-filter>
+				<action android:name="android.intent.action.MAIN" />
+			</intent-filter>
+		</activity>
+
+		<activity
+			android:name=".AppActivity1"
+			android:exported="false"
+			android:configChanges="touchscreen|keyboard|keyboardHidden|orientation|screenLayout|screenSize"
+			android:resizeableActivity="true"
+			android:supportsPictureInPicture="true"
+			android:theme="@style/Theme.PrivacySafe">
+			<intent-filter>
+				<action android:name="android.intent.action.MAIN" />
+			</intent-filter>
+		</activity>
+
+		<activity
+			android:name=".AppActivity2"
+			android:exported="false"
+			android:configChanges="touchscreen|keyboard|keyboardHidden|orientation|screenLayout|screenSize"
+			android:resizeableActivity="true"
+			android:supportsPictureInPicture="true"
+			android:theme="@style/Theme.PrivacySafe">
+			<intent-filter>
+				<action android:name="android.intent.action.MAIN" />
+			</intent-filter>
+		</activity>
+
+		<activity
+			android:name=".AppActivity3"
+			android:exported="false"
+			android:configChanges="touchscreen|keyboard|keyboardHidden|orientation|screenLayout|screenSize"
+			android:resizeableActivity="true"
+			android:supportsPictureInPicture="true"
+			android:theme="@style/Theme.PrivacySafe">
+			<intent-filter>
+				<action android:name="android.intent.action.MAIN" />
+			</intent-filter>
+		</activity>
+
+		<activity
+			android:name=".AppActivity4"
+			android:exported="false"
+			android:configChanges="touchscreen|keyboard|keyboardHidden|orientation|screenLayout|screenSize"
+			android:resizeableActivity="true"
+			android:supportsPictureInPicture="true"
+			android:theme="@style/Theme.PrivacySafe">
+			<intent-filter>
+				<action android:name="android.intent.action.MAIN" />
+			</intent-filter>
+		</activity>
+
+		<activity
+			android:name=".AppActivity5"
+			android:exported="false"
+			android:configChanges="touchscreen|keyboard|keyboardHidden|orientation|screenLayout|screenSize"
+			android:resizeableActivity="true"
+			android:supportsPictureInPicture="true"
+			android:theme="@style/Theme.PrivacySafe">
+			<intent-filter>
+				<action android:name="android.intent.action.MAIN" />
+			</intent-filter>
+		</activity>
+
+		<activity
+			android:name=".AppActivity6"
+			android:exported="false"
+			android:configChanges="touchscreen|keyboard|keyboardHidden|orientation|screenLayout|screenSize"
+			android:resizeableActivity="true"
+			android:supportsPictureInPicture="true"
+			android:theme="@style/Theme.PrivacySafe">
+			<intent-filter>
+				<action android:name="android.intent.action.MAIN" />
+			</intent-filter>
+		</activity>
+
+		<activity
+			android:name=".AppActivity7"
+			android:exported="false"
+			android:configChanges="touchscreen|keyboard|keyboardHidden|orientation|screenLayout|screenSize"
+			android:resizeableActivity="true"
+			android:supportsPictureInPicture="true"
+			android:theme="@style/Theme.PrivacySafe">
+			<intent-filter>
+				<action android:name="android.intent.action.MAIN" />
+			</intent-filter>
+		</activity>
+
+		<activity
+			android:name=".AppActivity8"
+			android:exported="false"
+			android:configChanges="touchscreen|keyboard|keyboardHidden|orientation|screenLayout|screenSize"
+			android:resizeableActivity="true"
+			android:supportsPictureInPicture="true"
+			android:theme="@style/Theme.PrivacySafe">
+			<intent-filter>
+				<action android:name="android.intent.action.MAIN" />
+			</intent-filter>
+		</activity>
+
+		<activity
+			android:name=".AppActivity9"
+			android:exported="false"
+			android:configChanges="touchscreen|keyboard|keyboardHidden|orientation|screenLayout|screenSize"
+			android:resizeableActivity="true"
+			android:supportsPictureInPicture="true"
+			android:theme="@style/Theme.PrivacySafe">
+			<intent-filter>
+				<action android:name="android.intent.action.MAIN" />
+			</intent-filter>
+		</activity>
+
+		<activity
+			android:name=".AppActivity10"
+			android:exported="false"
+			android:configChanges="touchscreen|keyboard|keyboardHidden|orientation|screenLayout|screenSize"
+			android:resizeableActivity="true"
+			android:supportsPictureInPicture="true"
+			android:theme="@style/Theme.PrivacySafe">
+			<intent-filter>
+				<action android:name="android.intent.action.MAIN" />
+			</intent-filter>
+		</activity>
+
+	</application>
+
+</manifest>

@@ -1,3 +1,38 @@
 {
-  "version": "0.0.1"
+  "name": "platform-ts",
+  "version": "0.21.1",
+  "private": true,
+  "description": "",
+  "license": "GPL-3.0-or-later",
+  "author": {
+    "name": "3NSoft Inc.",
+    "url": "https://3nsoft.com",
+    "email": "hq@3nsoft.com"
+  },
+  "scripts": {
+    "postinstall": "bash packing/mod-patch.sh",
+    "compile": "bash packing/compile.sh",
+    "compile-all": "npm run compile all",
+    "download-apps": "bash packing/get-versions-to-bundle.sh && echo && bash packing/collect-bundle-parts.sh"
+  },
+  "dependencies": {
+    "@types/semver": "^7.5.8",
+    "core-3nweb-client-lib": "^0.50.5",
+    "ecma-nacl": "^2.5.3",
+    "ecma-nacl-cryptors": "^1.0.1",
+    "portfinder": "1.0.38",
+    "protobufjs": "^7.5.5",
+    "punycode": "^2.1.1",
+    "rxjs": "^7.8.2",
+    "semver": "^7.6.2",
+    "url": "^0.11.4"
+  },
+  "devDependencies": {
+    "@types/node": "^24.1.0",
+    "@types/punycode": "^2.1.1",
+    "browserify": "^17.0.1",
+    "core-js": "^3.49.0",
+    "protobufjs-cli": "^1.0.2",
+    "typescript": "^5.9.3"
+  }
 }

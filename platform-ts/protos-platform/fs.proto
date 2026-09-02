@@ -1,0 +1,600 @@
+syntax = "proto3";
+
+import "common.proto";
+import "file.proto";
+
+package fs;
+
+
+message FS {
+	string type = 1;
+	bool is_versioned = 2;
+	bool writable = 3;
+	string name = 4;
+	// impl is a reference to object with methods of either
+	// ReadonlyFS or WritableFS
+	common.ObjectReference impl = 5;
+	bool is_synced = 6;
+}
+
+
+// ==== ReadonlyFS referable as impl object ====
+
+// --- ReadonlyFS.checkFolderPresence ---
+// Request body is CheckPresenceRequestBody
+// Reply body is common.BooleanValue
+
+message CheckPresenceRequestBody {
+	string path = 1;
+	common.BooleanValue throw_if_missing = 2;
+}
+
+// --- ReadonlyFS.checkFilePresence ---
+// Request body is CheckPresenceRequestBody
+// Reply body is common.BooleanValue
+
+// --- ReadonlyFS.checkLinkPresence ---
+// Request body is CheckPresenceRequestBody
+// Reply body is common.BooleanValue
+
+// --- ReadonlyFS.stat ---
+// Request body is PathOnlyRequestBody
+// Reply body is file.StatsMsg
+
+message PathOnlyRequestBody {
+	string path = 1;
+}
+
+// --- ReadonlyFS.getXAttr ---
+// Reply body is file.XAttrValue
+message GetXAttrRequestBody {
+	string path = 1;
+	string xa_name = 2;
+}
+
+// --- ReadonlyFS.listXAttrs ---
+// Request body is PathOnlyRequestBody
+// Reply body is common.StringArrayValue
+
+// --- ReadonlyFS.readLink ---
+// Request body is PathOnlyRequestBody
+// Reply body is SymLink
+
+message SymLink {
+	bool readonly = 1;
+	common.BooleanValue is_file = 2;
+	common.BooleanValue is_folder = 3;
+	common.ObjectReference impl = 4;
+}
+
+message SymLinkTargetReplyBody {
+	FS fs = 1;
+	file.File file = 2;
+}
+
+// --- ReadonlyFS.watchFolder ---
+// Its an observable call, and initial request is PathOnlyRequestBody
+// Observer expects common.StringValue in next.
+
+// --- ReadonlyFS.watchFile ---
+// Its an observable call, and initial request is PathOnlyRequestBody
+// Observer expects common.StringValue in next.
+
+// --- ReadonlyFS.watchTree ---
+// Its an observable call, and initial request is PathOnlyRequestBody
+// Observer expects common.StringValue in next.
+message WatchTreeRequestBody {
+	string path = 1;
+	common.UInt32Value depth = 2;
+}
+
+// --- ReadonlyFS.close ---
+// Request body is empty
+// Reply body is empty
+
+// --- ReadonlyFS.readonlySubRoot ---
+// Request body is PathOnlyRequestBody
+// Reply body is FS
+
+// --- ReadonlyFS.listFolder ---
+// Request body is PathOnlyRequestBody
+message ListFolderReplyBody {
+	repeated ListingEntryMsg entries = 1;
+}
+
+message ListingEntryMsg {
+	string name = 1;
+	common.BooleanValue is_file = 2;
+	common.BooleanValue is_folder = 3;
+	common.BooleanValue is_link = 4;
+}
+
+// --- ReadonlyFS.readJSONFile ---
+// Request body is PathOnlyRequestBody
+// Reply body contains utf8 bytes of a json string
+
+// --- ReadonlyFS.readTxtFile ---
+// Request body is PathOnlyRequestBody
+// Reply body contains utf8 bytes of a string
+
+// --- ReadonlyFS.readBytes ---
+// Reply body is file.ReadBytesReplyBody
+message ReadBytesRequestBody {
+	string path = 1;
+	common.UInt64Value start = 2;
+	common.UInt64Value end = 3;
+}
+
+// --- ReadonlyFS.getByteSource ---
+// Request body is PathOnlyRequestBody
+// Reply body is common.ObjectReference to bytes.FileByteSource.
+
+// --- ReadonlyFS.readonlyFile ---
+// Request body is PathOnlyRequestBody
+// Reply body is file.File
+
+// --- ReadonlyFS.select ---
+// Its an observable call.
+// First and only interim reply body is a common.ObjectReference to
+// FSCollection. Call completion indicates the end of a search process
+message SelectRequestBody {
+	message SelectCriteria {
+		common.StringValue exact_name = 1;
+		common.StringValue pattern = 2;
+		common.StringValue regexp = 3;
+		common.UInt32Value depth = 4;
+		repeated string type = 5;
+		string action = 6;
+	}
+	string path = 1;
+	SelectCriteria criteria = 2;
+}
+
+
+// ==== FSCollection referable object ====
+
+// --- FSCollection.get ---
+message FSCGetRequestBody {
+	string name = 1;
+}
+message FSCGetReplyBody {
+	FSItem item = 1;
+}
+
+message FSItem {
+	message Location {
+		FS fs = 1;
+		string path = 2;
+		string storage_use = 3;
+		string storage_type = 4;
+	}
+	message Item {
+		FS fs = 1;
+		file.File file = 2;
+		// collection is a reference to FSCollection
+		common.ObjectReference collection = 3;
+	}
+
+	common.BooleanValue is_file = 1;
+	common.BooleanValue is_folder = 2;
+	common.BooleanValue is_link = 3;
+	common.BooleanValue is_collection = 4;
+	Item item = 5;
+	Location location = 6;
+}
+
+// --- FSCollection.getAll ---
+// Request body is empty
+message FSCGetAllReplyBody {
+	repeated NameAndItem items = 1;
+}
+
+message NameAndItem {
+	string name = 1;
+	FSItem item = 2;
+}
+
+// --- FSCollection.entries ---
+// Request body is empty
+// Reply body is common.ObjectReference to iterator of IterResMsg
+
+message IterResMsg {
+	common.BooleanValue done = 1;
+	NameAndItem value = 2;
+}
+
+// --- FSCollection.watch ---
+// Its an observable call.
+// Observer expects CollectionEvent in next.
+
+message CollectionEvent {
+	string type = 1;
+	common.StringValue path = 2;
+	FSItem item = 3;
+}
+
+
+// ==== ReadonlyFSVersionedAPI referable object ====
+
+// --- ReadonlyFSVersionedAPI.whenConnected ---
+// Request body is empty
+// Reply body is empty
+
+// --- ReadonlyFSVersionedAPI.stat ---
+// Request body is PathAndFlagsRequestBody
+// Reply body is file.StatsMsg
+
+// --- ReadonlyFSVersionedAPI.getXAttr ---
+message VersionedGetXAttrRequestBody {
+	string path = 1;
+	string xa_name = 2;
+	file.VersionedReadFlags flags = 10;
+}
+// Reply body is file.VersionedGetXAttrReplyBody
+
+message PathAndFlagsRequestBody {
+	string path = 1;
+	file.VersionedReadFlags flags = 2;
+}
+
+// --- ReadonlyFSVersionedAPI.listXAttrs ---
+// Request body is PathAndFlagsRequestBody
+// Reply body is file.VersionedListXAttrsReplyBody
+
+// --- ReadonlyFSVersionedAPI.listFolder ---
+// Request body is PathAndFlagsRequestBody
+message VersionedListFolderReplyBody {
+	uint64 version = 1;
+	repeated ListingEntryMsg entries = 2;
+}
+
+// --- ReadonlyFSVersionedAPI.readJSONFile ---
+// Request body is PathAndFlagsRequestBody
+// Reply body is file.VersionedReadJsonReplyBody
+
+// --- ReadonlyFSVersionedAPI.readTxtFile ---
+// Request body is PathAndFlagsRequestBody
+// Reply body is file.VersionedReadTxtReplyBody
+
+// --- ReadonlyFSVersionedAPI.readBytes ---
+message VersionedReadBytesRequestBody {
+	string path = 1;
+	common.UInt64Value start = 2;
+	common.UInt64Value end = 3;
+	file.VersionedReadFlags flags = 10;
+}
+// Reply body is file.VersionedReadBytesReplyBody
+
+// --- ReadonlyFSVersionedAPI.getByteSource ---
+// Request body is PathAndFlagsRequestBody
+// Reply body is file.VersionedGetByteSourceReplyBody
+
+// --- ReadonlyFSVersionedAPI.getByteSource ---
+// Request body is PathAndFlagsRequestBody
+// Reply body is file.ListVersionsReplyBody
+
+
+// ==== WritableFS referable as impl object (extends ReadonlyFS) ====
+
+// --- WritableFS.updateXAttrs ---
+// Reply body is empty
+message UpdateXAttrsRequestBody {
+	string path = 1;
+	file.XAttrsChanges changes = 2;
+}
+
+// --- WritableFS.makeFolder ---
+// Reply body is empty
+message MakeFolderRequestBody {
+	string path = 1;
+	common.BooleanValue exclusive = 2;
+}
+
+// --- WritableFS.deleteFolder ---
+// Reply body is empty
+message DeleteFolderRequestBody {
+	string path = 1;
+	common.BooleanValue remove_content = 2;
+}
+
+// --- WritableFS.deleteFile ---
+// Request body is PathOnlyRequestBody
+// Reply body is empty
+
+// --- WritableFS.move ---
+// Reply body is empty
+message MoveRequestBody {
+	string src = 1;
+	string dst = 2;
+}
+
+// --- WritableFS.copyFile ---
+// Reply body is empty
+message CopyFileRequestBody {
+	string src = 1;
+	string dst = 2;
+	common.BooleanValue overwrite = 3;
+}
+
+// --- WritableFS.copyFolder ---
+// Reply body is empty
+message CopyFolderRequestBody {
+	string src = 1;
+	string dst = 2;
+	common.BooleanValue merge_and_overwrite = 3;
+}
+
+// --- WritableFS.saveFile ---
+// Reply body is empty
+message SaveFileRequestBody {
+	// file is a reference to File impl object
+	common.ObjectReference file = 1;
+	string dst = 2;
+	common.BooleanValue overwrite = 3;
+}
+
+// --- WritableFS.saveFolder ---
+// Reply body is empty
+message SaveFolderRequestBody {
+	// file is a reference to FS impl object
+	common.ObjectReference folder = 1;
+	string dst = 2;
+	common.BooleanValue merge_and_overwrite = 3;
+}
+
+// --- WritableFS.deleteLink ---
+// Request body is PathOnlyRequestBody
+// Reply body is empty
+
+// --- WritableFS.link ---
+// Reply body is empty
+message LinkRequestBody {
+	string path = 1;
+	// target is a reference to either FS or File impl object
+	common.ObjectReference target = 2;
+}
+
+// --- WritableFS.writableSubRoot ---
+// Request body is PathAndOptFileFlags
+// Reply body is FS
+
+message PathAndOptFileFlags {
+	string path = 1;
+	FileFlags flags = 2;
+}
+
+message FileFlags {
+	common.BooleanValue truncate = 1;
+	common.BooleanValue create = 2;
+	common.BooleanValue exclusive = 3;
+}
+
+// --- WritableFS.writeJSONFile ---
+// Reply body is empty
+message WriteJsonFileRequestBody {
+	string path = 1;
+	string json = 2;
+	FileFlags flags = 3;
+}
+
+// --- WritableFS.writeTxtFile ---
+// Reply body is empty
+message WriteTxtFileRequestBody {
+	string path = 1;
+	string txt = 2;
+	FileFlags flags = 3;
+}
+
+// --- WritableFS.writeBytes ---
+// Reply body is empty
+message WriteBytesRequestBody {
+	string path = 1;
+	bytes bytes = 2;
+	FileFlags flags = 3;
+}
+
+// --- WritableFS.getByteSink ---
+// Request body is PathAndOptFileFlags
+// Reply body is common.ObjectReference to bytes.FileByteSink
+
+// --- WritableFS.writableFile ---
+// Request body is PathAndOptFileFlags
+// Reply body is file.File
+
+
+// ==== WritableFSVersionedAPI referable object
+//                                      (extends ReadonlyFSVersionedAPI) ====
+
+// --- WritableFSVersionedAPI.updateXAttrs ---
+// Request body is UpdateXAttrsRequestBody
+// Reply body is common.UInt64Value
+
+// --- WritableFSVersionedAPI.writeJSONFile ---
+// Reply body is common.UInt64Value
+message VersionedWriteJsonFileRequestBody {
+	string path = 1;
+	string json = 2;
+	VersionedFileWriteFlags flags = 3;
+}
+
+message VersionedFileWriteFlags {
+	common.BooleanValue truncate = 1;
+	common.BooleanValue create = 2;
+	common.BooleanValue exclusive = 3;
+	common.UInt64Value current_version = 10;
+}
+
+// --- WritableFSVersionedAPI.writeTxtFile ---
+// Reply body is common.UInt64Value
+message VersionedWriteTxtFileRequestBody {
+	string path = 1;
+	string txt = 2;
+	VersionedFileWriteFlags flags = 3;
+}
+
+// --- WritableFSVersionedAPI.writeBytes ---
+// Reply body is common.UInt64Value
+message VersionedWriteBytesRequestBody {
+	string path = 1;
+	bytes bytes = 2;
+	VersionedFileWriteFlags flags = 3;
+}
+
+// --- WritableFSVersionedAPI.getByteSink ---
+// Reply body is file.VersionedGetByteSinkReplyBody
+message VersionedGetByteSinkRequestBody {
+	string path = 1;
+	VersionedFileWriteFlags flags = 2;
+}
+
+// --- WritableFSVersionedAPI.archiveCurrent ---
+// Reply body is common.UInt64Value
+message ArchiveCurrentRequestBody {
+	string path = 1;
+	common.UInt64Value version = 2;
+}
+
+
+// ==== ReadonlyFSSyncAPI referable object ====
+
+// --- ReadonlyFSSyncAPI.status ---
+// Reply body is file.SyncStatusMsg
+message FSSyncStatusRequestBody {
+	string path = 1;
+	bool skip_server_check = 2;
+}
+
+// --- ReadonlyFSSyncAPI.isRemoteVersionOnDisk ---
+message FSSyncIsOnDiskRequestBody {
+	string path = 1;
+	uint64 version = 2;
+}
+message FSSyncIsOnDiskReplyBody {
+	string status = 1;
+}
+
+// --- ReadonlyFSSyncAPI.startDownload ---
+// Reply body is file.FileSyncStartDownloadReplyBody
+message FSSyncStartDownloadRequestBody {
+	string path = 1;
+	uint64 version = 2;
+}
+
+// --- ReadonlyFSSyncAPI.adoptRemote ---
+// Reply body is empty
+message AdoptRemoteRequestBody {
+	string path = 1;
+	file.OptionsToAdopteRemote opts = 2;
+}
+
+// --- ReadonlyFSSyncAPI.diffCurrentAndRemoteFileVersions ---
+// Reply body is file.DiffCurrentAndRemoteReplyBody
+message DiffCurrentAndRemoteFileVersionsRequestBody {
+	string path = 1;
+	file.OptionsToDiffFileVersions opts = 2;
+}
+
+// --- ReadonlyFSSyncAPI.diffCurrentAndRemoteFolderVersions ---
+message DiffCurrentAndRemoteFolderVersionsRequestBody {
+	string path = 1;
+	common.UInt64Value remote_version = 2;
+}
+message DiffCurrentAndRemoteReplyBody {
+	FolderDiff diff = 1;
+}
+
+message FolderDiff {
+	// CommonDiff fields
+	uint64 current_version = 1;
+	bool is_current_local = 2;
+	common.UInt64Value remote_version = 3;
+	common.UInt64Value synced_version = 4;
+	bool is_remote_removed = 5;
+	file.TimeStampsDiff ctime = 6;
+	file.TimeStampsDiff mtime = 7;
+	repeated file.XAttrDiff xattrs = 8;
+
+	message ItemsByBranches {
+		repeated string in_local = 1;
+		repeated string in_remote = 2;
+	}
+	message Renamed {
+		string local = 1;
+		string remote = 2;
+		string renamed_in = 3;
+	}
+	message Rekeyed {
+		string local = 1;
+		string remote = 2;
+		string rekeyed_in = 3;
+	}
+	ItemsByBranches removed = 11;
+	repeated Renamed renamed = 12;
+	ItemsByBranches added = 13;
+	repeated Rekeyed rekeyed = 14;
+	repeated string name_overlaps = 15;
+}
+
+message RemoteChildRequestBody {
+	string path = 1;
+	string remote_item_name = 2;
+	common.UInt64Value remote_version = 3;
+}
+
+// --- ReadonlyFSSyncAPI.statRemoteItem ---
+// Request body is RemoteChildRequestBody
+// Reply body is file.StatsMsg
+
+// --- ReadonlyFSSyncAPI.listRemoteFolderItem ---
+// Request body is RemoteChildRequestBody
+// Reply body is ListFolderReplyBody
+
+// --- ReadonlyFSSyncAPI.getRemoteFileItem ---
+// Request body is RemoteChildRequestBody
+// Reply body is file.File
+
+// --- ReadonlyFSSyncAPI.getRemoteFolderItem ---
+// Request body is RemoteChildRequestBody
+// Reply body is FS
+
+
+// ==== WritableFSSyncAPI referable object ====
+
+// --- WritableFSSyncAPI.upload ---
+// Reply body is file.FileSyncUploadReplyBody
+message FSSyncUploadRequestBody {
+	string path = 1;
+	file.OptionsToUploadLocal opts = 2;
+}
+
+// --- WritableFSSyncAPI.startUpload ---
+// Request body is FSSyncUploadRequestBody
+// Reply body is file.FileSyncStartUploadReplyBody
+
+// --- WritableFSSyncAPI.adoptRemoteFolderItem ---
+// Reply body is common.UInt64Value
+message AdoptRemoteFolderItemRequestBody {
+	message Options {
+		common.UInt64Value local_version = 1;
+		common.UInt64Value upload_version = 2;
+		common.BooleanValue replace_local_item = 3;
+		common.StringValue new_item_name = 4;
+	}
+	string path = 1;
+	string item_name = 2;
+	Options opts = 3;
+}
+
+// --- WritableFSSyncAPI.absorbRemoteFolderChanges ---
+message AbsorbRemoteFolderChangesRequestBody {
+	message Options {
+		common.UInt64Value local_version = 1;
+		common.StringValue postfix_for_name_overlaps = 2;
+		common.UInt64Value remote_version = 3;
+	}
+	string path = 1;
+	Options opts = 2;
+}
+message AbsorbRemoteFolderChangesReplyBody {
+	common.UInt64Value new_version = 1;
+}

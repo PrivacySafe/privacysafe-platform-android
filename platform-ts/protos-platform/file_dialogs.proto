@@ -1,0 +1,50 @@
+syntax = "proto3";
+
+import "common.proto";
+import "file.proto";
+import "fs.proto";
+
+package file_dialogs;
+
+message FileTypeFilter {
+	string name = 1;
+	repeated string extensions = 2;
+}
+
+// --- Dialogs.saveFileDialog ---
+// Request body is SaveDialogArgs
+message SaveFileDialogReplyBody {
+	file.File file = 1;
+}
+
+message SaveDialogArgs {
+	string title = 1;
+	string btnLabel = 2;
+	string defaultPath = 3;
+	repeated FileTypeFilter filters = 4;
+}
+
+// --- Dialogs.saveFolderDialog ---
+// Request body is SaveDialogArgs
+message SaveFolderDialogReplyBody {
+	fs.FS folder = 1;
+}
+
+// --- Dialogs.openFileDialog ---
+// Request body is OpenDialogArgs
+message OpenFileDialogReplyBody {
+	repeated file.File files = 1;
+}
+
+message OpenDialogArgs {
+	string title = 1;
+	string btnLabel = 2;
+	bool multiSelections = 3;
+	repeated FileTypeFilter filters = 4;
+}
+
+// --- Dialogs.openFolderDialog ---
+// Request body is OpenDialogArgs
+message OpenFolderDialogReplyBody {
+	repeated fs.FS folders = 1;
+}

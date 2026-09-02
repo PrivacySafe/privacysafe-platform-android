@@ -1,0 +1,18 @@
+syntax = "proto3";
+
+import "common.proto";
+import "file.proto";
+import "fs.proto";
+
+package shell_fs_resource;
+
+
+// ==== shell.getFSResource capability ====
+message GetFSResourceRequestBody {
+	common.StringValue appDomain = 1;
+	string resourceName = 2;
+}
+message GetFSResourceReplyBody {
+	fs.FS folder = 1;
+	file.File file = 2;
+}

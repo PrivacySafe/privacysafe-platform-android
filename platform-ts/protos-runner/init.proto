@@ -1,0 +1,24 @@
+syntax = "proto2";
+
+package init;
+
+message DataDirArgs {
+	required string data_dir = 1;
+}
+
+message ConnectorIdArgs {
+	required string connector_id = 1;
+}
+
+message ConnectorAndObjPathArgs {
+	required string connector_id = 1;
+	repeated string obj_path = 2;
+}
+
+message ObjPathArgs {
+	repeated string obj_path = 1;
+}
+
+message UrlArgs {
+	required string url = 1;
+}

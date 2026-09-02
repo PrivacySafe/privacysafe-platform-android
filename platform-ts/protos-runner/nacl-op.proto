@@ -1,0 +1,15 @@
+syntax = "proto2";
+
+package nacl_op;
+
+message OpenArgs {
+	required bytes c = 1;
+	required bytes n = 2;
+	required bytes k = 3;
+}
+
+message PackArgs {
+	required bytes m = 1;
+	required bytes n = 2;
+	required bytes k = 3;
+}

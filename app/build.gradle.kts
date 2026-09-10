@@ -47,6 +47,9 @@ android {
       keyPassword = System.getenv("RELEASE_KEY_PASS")
       storeFile = file("release.jks")
       storePassword = System.getenv("RELEASE_JKS_PASS")
+      enableV1Signing = true
+      enableV2Signing = true
+      enableV3Signing = true
     }
   }
 

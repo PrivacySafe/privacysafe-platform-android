@@ -15,7 +15,8 @@ android {
     val versionCodeFile = "version-code"
     return try {
       File(versionCodeFile).readText().toInt()
-    } catch (_: Throwable) {
+    } catch (err: Throwable) {
+      println("Error in reading $versionCodeFile: $err")
       println("Version code wasn't read from file $versionCodeFile, using default value $testVersion")
       testVersion
     }
@@ -25,7 +26,8 @@ android {
     val versionNameFile = "version-name"
     return try {
       File(versionNameFile).readText()
-    } catch (_: Throwable) {
+    } catch (err: Throwable) {
+      println("Error in reading $versionNameFile: $err")
       println("Version name wasn't read from file $versionNameFile, using default value $testVersion")
       testVersion
     }

@@ -12,22 +12,20 @@ android {
   compileSdk = 36
 
   fun readVersionCodeFromFileOr(testVersion: Int): Int {
-    val versionCodeFile = "version-code"
+    val versionCodeFile = "app/version-code"
     return try {
-      File(versionCodeFile).readText().toInt()
-    } catch (err: Throwable) {
-      println("Error in reading $versionCodeFile: $err")
+      File(versionCodeFile).readText().trim().toInt()
+    } catch (_: Throwable) {
       println("Version code wasn't read from file $versionCodeFile, using default value $testVersion")
       testVersion
     }
   }
 
   fun readVersionNameFromFileOr(testVersion: String): String {
-    val versionNameFile = "version-name"
+    val versionNameFile = "app/version-name"
     return try {
       File(versionNameFile).readText()
-    } catch (err: Throwable) {
-      println("Error in reading $versionNameFile: $err")
+    } catch (_: Throwable) {
       println("Version name wasn't read from file $versionNameFile, using default value $testVersion")
       testVersion
     }

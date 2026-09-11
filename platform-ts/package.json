@@ -1,6 +1,6 @@
 {
   "name": "platform-ts",
-  "version": "0.21.9",
+  "version": "0.21.10",
   "private": true,
   "description": "",
   "license": "GPL-3.0-or-later",
@@ -17,7 +17,7 @@
   },
   "dependencies": {
     "@types/semver": "^7.5.8",
-    "core-3nweb-client-lib": "^0.50.5",
+    "core-3nweb-client-lib": "^0.51.0",
     "ecma-nacl": "^2.5.3",
     "ecma-nacl-cryptors": "^1.0.1",
     "portfinder": "1.0.38",

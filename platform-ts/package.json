@@ -1,6 +1,6 @@
 {
   "name": "platform-ts",
-  "version": "0.21.10",
+  "version": "0.21.11",
   "private": true,
   "description": "",
   "license": "GPL-3.0-or-later",
@@ -13,11 +13,11 @@
     "postinstall": "bash packing/mod-patch.sh",
     "compile": "bash packing/compile.sh",
     "compile-all": "npm run compile all",
-    "download-apps": "bash packing/get-versions-to-bundle.sh && echo && bash packing/collect-bundle-parts.sh"
+    "download-apps": "bash packing/get-versions-to-bundle.sh"
   },
   "dependencies": {
     "@types/semver": "^7.5.8",
-    "core-3nweb-client-lib": "^0.51.0",
+    "core-3nweb-client-lib": "^0.52.0",
     "ecma-nacl": "^2.5.3",
     "ecma-nacl-cryptors": "^1.0.1",
     "portfinder": "1.0.38",

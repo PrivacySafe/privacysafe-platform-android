@@ -4,4 +4,5 @@
 /src/main/assets/scripts-webview/*
 /src/main/assets/scripts-jsengine/*
 /env-path-addition
+/enable-r8-minifications
 *.jks

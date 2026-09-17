@@ -34,16 +34,16 @@ android {
   fun enableR8inBuild(): Boolean {
     val enableR8NameFile = "app/enable-r8-minifications"
     val flag = try {
-      File(enableR8NameFile).readText()
+      File(enableR8NameFile).readText().trim()
     } catch (_: Throwable) {
       println("File $enableR8NameFile is not found, thus, R8 optimizations and minifications will not be applied to this build")
       return false
     }
     if (flag == "true") {
-      println("R8 optimizations and minifications will be applied to this build")
+      println("R8 optimizations and minifications will be applied to this build, following file $enableR8NameFile")
       return true
     } else {
-      println("R8 optimizations and minifications will not be applied to this build")
+      println("R8 optimizations and minifications will not be applied to this build, following file $enableR8NameFile")
       return false
     }
   }

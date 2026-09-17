@@ -31,6 +31,23 @@ android {
     }
   }
 
+  fun enableR8inBuild(): Boolean {
+    val enableR8NameFile = "app/enable-r8-minifications"
+    val flag = try {
+      File(enableR8NameFile).readText()
+    } catch (_: Throwable) {
+      println("File $enableR8NameFile is not found, thus, R8 optimizations and minifications will not be applied to this build")
+      return false
+    }
+    if (flag == "true") {
+      println("R8 optimizations and minifications will be applied to this build")
+      return true
+    } else {
+      println("R8 optimizations and minifications will not be applied to this build")
+      return false
+    }
+  }
+
   defaultConfig {
     applicationId = "app.privacysafe"
     minSdk = 29
@@ -55,10 +72,18 @@ android {
 
   buildTypes {
     release {
-      isMinifyEnabled = false
       proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
       signingConfig = signingConfigs.getByName("release")
       isDebuggable = false
+      if (enableR8inBuild()) {
+        isMinifyEnabled = true
+        isShrinkResources = true
+        optimization {
+          enable = true
+        }
+      } else {
+        isMinifyEnabled = false
+      }
     }
   }
 

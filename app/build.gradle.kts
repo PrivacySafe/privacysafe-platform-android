@@ -58,11 +58,16 @@ android {
 //    testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
   }
 
+  val keyFileName = "release.jks"
+  fun keyFilePresent(): Boolean {
+    return File("app/$keyFileName").isFile
+  }
+
   signingConfigs {
     create("release") {
       keyAlias = System.getenv("RELEASE_KEY_ALIAS")
       keyPassword = System.getenv("RELEASE_KEY_PASS")
-      storeFile = file("release.jks")
+      storeFile = file(keyFileName)
       storePassword = System.getenv("RELEASE_JKS_PASS")
       enableV1Signing = true
       enableV2Signing = true
@@ -73,7 +78,9 @@ android {
   buildTypes {
     release {
       proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
-      signingConfig = signingConfigs.getByName("release")
+      if (keyFilePresent()) {
+        signingConfig = signingConfigs.getByName("release")
+      }
       isDebuggable = false
       if (enableR8inBuild()) {
         isMinifyEnabled = true

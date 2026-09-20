@@ -36,16 +36,10 @@ android {
     val flag = try {
       File(enableR8NameFile).readText().trim()
     } catch (_: Throwable) {
-      println("File $enableR8NameFile is not found, thus, R8 optimizations and minifications will not be applied to this build")
+      println("File $enableR8NameFile not found")
       return false
     }
-    if (flag == "true") {
-      println("R8 optimizations and minifications will be applied to this build, following file $enableR8NameFile")
-      return true
-    } else {
-      println("R8 optimizations and minifications will not be applied to this build, following file $enableR8NameFile")
-      return false
-    }
+    return (flag == "true")
   }
 
   defaultConfig {
@@ -79,16 +73,21 @@ android {
     release {
       proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
       if (keyFilePresent()) {
+        println("Key file found, and signing is enabled for this release build")
         signingConfig = signingConfigs.getByName("release")
+      } else {
+        println("Key file is not found, and signing is not enabled for this release build")
       }
       isDebuggable = false
       if (enableR8inBuild()) {
+        println("R8 optimizations and minifications are enabled for this release build")
         isMinifyEnabled = true
         isShrinkResources = true
         optimization {
           enable = true
         }
       } else {
+        println("R8 optimizations and minifications are not enabled for this release build")
         isMinifyEnabled = false
       }
     }

@@ -178,7 +178,7 @@ class AppInAndroid extends App {
 		} else {
 			entrypoint = MAIN_GUI_ENTRYPOINT;
 		}
-		const deferredLaunch = defer<ConnectorIdAndEntrypoint>()
+		const deferredLaunch = defer<ConnectorIdAndEntrypoint>();
 		this.launchesFromAndroid.set(entrypoint, deferredLaunch);
 		this.launchWebGUI(entrypoint, devTools)
 		.catch(exc => {

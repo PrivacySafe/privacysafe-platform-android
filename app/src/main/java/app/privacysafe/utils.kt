@@ -19,9 +19,17 @@ package app.privacysafe
 import android.Manifest
 import android.app.AlertDialog
 import android.content.Context
-import android.os.HandlerThread
+import android.content.pm.PackageManager
+import android.util.Log
+import android.webkit.PermissionRequest
+import androidx.activity.ComponentActivity
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.core.app.ActivityCompat
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import java.io.BufferedReader
 import java.io.InputStream
@@ -160,22 +168,78 @@ interface Bundled {
 
 interface Permission {
 
-	interface Notifications {
-		companion object {
-			const val requestCode = 1
-			const val name = "android.permission.POST_NOTIFICATIONS"
-		}
-	}
+	companion object {
+		const val POST_NOTIFICATIONS = "android.permission.POST_NOTIFICATIONS"
+		const val CAMERA = Manifest.permission.CAMERA
+		const val RECORD_AUDIO = Manifest.permission.RECORD_AUDIO
 
-	interface Camera {
-		companion object {
-			const val requestCode = 2
-			const val name = Manifest.permission.CAMERA
-		}
+		const val WEBKIT_RESOURCE_AUDIO_CAPTURE = PermissionRequest.RESOURCE_AUDIO_CAPTURE
+		const val WEBKIT_RESOURCE_VIDEO_CAPTURE = PermissionRequest.RESOURCE_VIDEO_CAPTURE
 	}
 
 }
 
+suspend fun checkAndRequestPermission(activity: ComponentActivity, permission: String): Boolean {
+	if (activity.checkSelfPermission(permission) == PackageManager.PERMISSION_GRANTED) {
+		return true
+	}
+	val deferred = CompletableDeferred<Boolean>()
+	val requester = activity.registerForActivityResult(ActivityResultContracts.RequestPermission()) {
+		isGranted -> deferred.complete(isGranted)
+	}
+	try {
+		requester.launch(permission)
+		return deferred.await()
+	} finally {
+		requester.unregister()
+	}
+}
+
+fun checkPermissionAndRegisterRequesterIfNeeded(
+	activity: ComponentActivity, permission: String
+): (suspend () -> Boolean)? {
+	if (activity.checkSelfPermission(permission) == PackageManager.PERMISSION_GRANTED) {
+		return null
+	}
+	val deferred = CompletableDeferred<Boolean>()
+	val requester = activity.registerForActivityResult(ActivityResultContracts.RequestPermission()) {
+			isGranted -> deferred.complete(isGranted)
+	}
+	return suspend {
+		try {
+			requester.launch(permission)
+			deferred.await()
+		} finally {
+			requester.unregister()
+		}
+	}
+}
+
+fun checkMultiplePermissionsAndRegisterRequesterIfNeeded(
+	activity: ComponentActivity, vararg permissions: String
+): (suspend () -> Map<String, Boolean>)? {
+	val missingPermissions = mutableListOf<String>()
+	for (permission in permissions) {
+		if (activity.checkSelfPermission(permission) != PackageManager.PERMISSION_GRANTED) {
+			missingPermissions.add(permission)
+		}
+	}
+	if (missingPermissions.isEmpty()) {
+		return null
+	}
+	val deferred = CompletableDeferred<Map<String, Boolean>>()
+	val requester = activity.registerForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) {
+			grants -> deferred.complete(grants)
+	}
+	return suspend {
+		try {
+			requester.launch(missingPermissions.toTypedArray())
+			deferred.await()
+		} finally {
+			requester.unregister()
+		}
+	}
+}
 
 
 

@@ -106,6 +106,8 @@ private class WebChromeClientFor3NWebApp (
 		Log.d("w3n", "onPermissionRequest called with ${
 			request?.resources?.joinToString(", ", "[ ", " ]")
 		}")
+		// TODO process this in accordance with permissions from manifest. Meanwhile, just grant
+		//  - WEBKIT_... permissions ?
 		request?.grant(request.resources)
 //		super.onPermissionRequest(request)
 	}

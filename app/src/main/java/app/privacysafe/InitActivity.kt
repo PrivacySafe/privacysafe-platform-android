@@ -20,12 +20,9 @@ import android.app.NotificationManager
 import android.content.Context.NOTIFICATION_SERVICE
 import android.content.Intent
 import android.content.ServiceConnection
-import android.content.pm.PackageManager
 import android.os.Bundle
 import android.util.Log
-import android.webkit.PermissionRequest
 import androidx.activity.ComponentActivity
-import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
@@ -36,23 +33,20 @@ class InitActivity : ComponentActivity() {
 	private val scope = CoroutineScope(Dispatchers.Main)
 	private lateinit var coreSrvConn: ServiceConnection
 
-	private lateinit var notifications: Notifications
+	private lateinit var notifications: NotificationManager
 
 	private lateinit var core: CoreInit
 
 	override fun onCreate(savedInstanceState: Bundle?) {
-		Log.d("w3n", "-> ${this}.onCreate() \n action: ${intent.action} \n data: ${intent.data}")
-
 		super.onCreate(savedInstanceState)
 		setContentView(R.layout.init_layout)
-		notifications = Notifications(this)
-
-		Log.d("w3n", "intent at creation of InitActivity \n action: ${intent.action} \n data: ${intent.data}")
+		notifications = getSystemService(NOTIFICATION_SERVICE) as NotificationManager
+		val permissionRequester = checkPermissionAndRegisterRequesterIfNeeded(this, Permission.POST_NOTIFICATIONS)
 
 		scope.launch {
-			val havePermissions = notifications.request()
+			val havePermissions = if (permissionRequester == null) { true } else { permissionRequester() }
 			if (havePermissions) {
-				addCoreRunnerNotificationChannelTo(applicationContext, notifications.mngr)
+				addCoreRunnerNotificationChannelTo(applicationContext, notifications)
 				startCoreRunnerService(applicationContext)
 				startCoreServiceAndForwardToSystemApp()
 			} else {
@@ -62,16 +56,10 @@ class InitActivity : ComponentActivity() {
 	}
 
 	override fun onNewIntent(intent: Intent) {
-
-		Log.d("w3n", "-> ${this}.onNewIntent() \n action: ${intent.action} \n data: ${intent.data}")
-
 		super.onNewIntent(intent)
 	}
 
 	override fun onResume() {
-
-		Log.d("w3n", "-> ${this}.onResume() \n action: ${intent.action} \n data: ${intent.data}")
-
 		super.onResume()
 	}
 
@@ -107,79 +95,11 @@ class InitActivity : ComponentActivity() {
 		}
 	}
 
-	override fun onRequestPermissionsResult(
-		requestCode: Int,
-		permissions: Array<out String?>,
-		grantResults: IntArray,
-		deviceId: Int
-	) {
-		super.onRequestPermissionsResult(requestCode, permissions, grantResults, deviceId)
-		if (requestCode != Permission.Notifications.requestCode) {
-			return
-		}
-		notifications.onRequestPermissionsResult(permissions, grantResults)
-	}
-
 	override fun onDestroy() {
 		if (this::coreSrvConn.isInitialized) {
 			unbindService(coreSrvConn)
 		}
 		super.onDestroy()
-	}
-
-}
-
-private class Notifications(
-	val activity: InitActivity,
-) {
-	val mngr: NotificationManager = activity.getSystemService(NOTIFICATION_SERVICE) as NotificationManager
-
-	val enabled get() = mngr.areNotificationsEnabled()
-
-	var deferred = CompletableDeferred<Boolean>()
-
-	suspend fun request(): Boolean {
-		if (enabled) {
-			return true
-		}
-		activity.requestPermissions(
-			arrayOf(
-				Permission.Notifications.name,
-				// TODO this is an adhoc way to quickly check webrtc run. But, these asks should be in 3NWeb app activity.
-				//      May be we should have a permissions getting object.
-				//      Sound and video pass through to peer. Choices' code was also for electron. The rest is app's
-				//      concerns.
-				PermissionRequest.RESOURCE_AUDIO_CAPTURE,
-				PermissionRequest.RESOURCE_VIDEO_CAPTURE
-			),
-			Permission.Notifications.requestCode
-		)
-		while (!deferred.isCompleted) {
-			if (enabled) {
-				deferred.complete(true)
-				break
-			}
-			delay(100)
-		}
-		return enabled
-	}
-
-	fun onRequestPermissionsResult(
-		permissions: Array<out String?>,
-		grantResults: IntArray,
-	) {
-		for (i in 0..permissions.size-1) {
-			val permission = permissions[i]
-			val result = grantResults[i]
-			when (permission) {
-				Permission.Notifications.name -> {
-					if (result == PackageManager.PERMISSION_GRANTED) {
-						deferred.complete(true)
-					}
-				}
-			}
-		}
-
 	}
 
 }

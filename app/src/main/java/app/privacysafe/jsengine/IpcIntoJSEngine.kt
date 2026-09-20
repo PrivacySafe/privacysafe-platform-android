@@ -20,7 +20,6 @@ import android.annotation.SuppressLint
 import android.content.res.AssetManager
 import android.os.Handler
 import android.os.HandlerThread
-import android.os.Looper
 import android.util.Log
 import androidx.javascriptengine.JavaScriptConsoleCallback.ConsoleMessage
 import androidx.javascriptengine.JavaScriptIsolate
@@ -65,7 +64,6 @@ abstract class IpcIntoJSEngine(
 	private val portMsgsInInfoConsole: ListenerOfPortMsgsInInfoConsole?
 
 	init {
-		Log.d("w3n", "IpcIntoJSEngine.init() on freshly created jsengine isolate, p 0")
 		val loggingExecutor = Executors.newSingleThreadExecutor()
 		val processInfoMsg = if (jsHas.namedPorts) {
 			portMsgsInInfoConsole = null
@@ -90,9 +88,7 @@ abstract class IpcIntoJSEngine(
 		js.addOnTerminatedCallback(loggingExecutor) { info ->
 			onTerminated(info)
 		}
-		Log.d("w3n", "IpcIntoJSEngine.init() on freshly created jsengine isolate, p 1")
 		js.loadFrom(assets, Bundled.Path.commonPreload)
-		Log.d("w3n", "IpcIntoJSEngine.init() on freshly created jsengine isolate, p 2, done")
 	}
 
 	protected open fun onConsoleLogMsg(msg: ConsoleMessage) {}
@@ -477,32 +473,11 @@ abstract class InjectedSyncHandler(
 		port.connectTo { msg ->
 			val (id, args) = ProtoBuf.decodeFromByteArray<RequestWithinCallIntoAndroid>(msg)
 			val reply = try {
-				// PERF in DEBUG
-//				val startTS = Clock.System.now().toEpochMilliseconds()
-
 				val res = call(args)
-
-				// DEBUG
-//				if (!portName.startsWith("fh_") && !portName.startsWith("fs_")) Log.d("w3n", "$portName returns result to js in ${
-//					(Clock.System.now().toEpochMilliseconds() - startTS)} milliseconds"
-//				)
-
 				ReplyWithinCall(id, res ?: ByteArray(0))
 			} catch (err: RuntimeException) {
-
-				// DEBUG
-//				Log.d("w3n", "$portName has runtime error for js:\n${err.toJSON()}")
-
 				ReplyWithinCall(id, ByteArray(0), err.toJSON())
 			} catch (err: Throwable) {
-
-				// DEBUG
-				Log.e(
-					"w3n", "error in processing message in port $portName:\n$err\n${err.message}:\n${
-						err.stackTraceToString()
-					}"
-				)
-
 				ReplyWithinCall(
 					id, ByteArray(0),
 					"${err.message}:\n${err.stackTrace.joinToString("\n")}"
@@ -531,35 +506,13 @@ abstract class InjectedAsyncHandler(
 			scope.launch {
 
 				val reply = try {
-					// PERF in DEBUG
-//					val startTS = Clock.System.now().toEpochMilliseconds()
-
 					val res = call(args)
-
-					// DEBUG
-//					if (portName != "delay") Log.d("w3n", "$portName returns result to js in ${
-//							(Clock.System.now().toEpochMilliseconds() - startTS)
-//						} milliseconds"
-//					)
-
 					ReplyWithinCall(id, res ?: ByteArray(0))
 				} catch (err: RuntimeException) {
-
-					// DEBUG
-//					Log.d("w3n", "$portName has runtime error for js:\n${err.toJSON()}")
-
 					ReplyWithinCall(id, ByteArray(0), err.toJSON())
 				} catch (_: CancellationException) {
 					return@launch
 				} catch (err: Throwable) {
-
-					// DEBUG
-					Log.e(
-						"w3n", "error in processing message in port $portName:\n$err\n${err.message}:\n${
-							err.stackTraceToString()
-						}"
-					)
-
 					ReplyWithinCall(
 						id, ByteArray(0),
 						"${err.message}:\n${err.stackTraceToString()}"

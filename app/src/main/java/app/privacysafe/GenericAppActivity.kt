@@ -54,12 +54,25 @@ abstract class GenericAppActivity() : ComponentActivity() {
 		val connectorId = intent.extras?.getString(CONNECTOR_ID_OF_3NWEB_APP_INSTANCE)
 		val entrypoint = intent.extras?.getString(APP_COMPONENT_ENTRYPOINT)
 		val urlHash = intent.extras?.getString(APP_URL_HASH)
-		Log.d("w3n", "Opening activity with for $appDomain connector #$connectorId, entrypoint $entrypoint")
 		val (conn, coreDef) = bindCoreServiceFor3NWebApp(this, appDomain) { _: ComponentName? ->
 			finishAndRemoveTask()
 		}
 		appSrvConn = conn
+		val permissionRequester = checkMultiplePermissionsAndRegisterRequesterIfNeeded(
+			this, Permission.RECORD_AUDIO, Permission.CAMERA,
+		)
+
+		// TODO
+		//  - info about required permissions should be available here
+		//  - should manifest, or parameters from it be in intent's extra's?
+
+
 		scope.launch {
+
+			if (permissionRequester != null) {
+				permissionRequester()
+			}
+
 			val coreSrv = coreDef.await()
 
 			if (coreSrv.isUserLoggedIn) {
@@ -67,6 +80,12 @@ abstract class GenericAppActivity() : ComponentActivity() {
 					coreSrv.openLauncher()
 					finishAndRemoveTask()
 					return@launch
+				}
+				if (connectorId == null) {
+					if (coreSrv.findAnFocusOpenAppInstance(appDomain)) {
+						finishAndRemoveTask()
+						return@launch
+					}
 				}
 			} else if ((appDomain != Bundled.startupDomain) && (appDomain != Bundled.launcherDomain)) {
 				coreSrv.loginAndOpenApp(appDomain)
@@ -89,6 +108,8 @@ abstract class GenericAppActivity() : ComponentActivity() {
 				core.setUICallbacks(
 					close = { finishAndRemoveTask() },
 					focus = {
+						Log.d("w3n", "GenericAppActivity.focus() of ${core.appDomain}, ${core.entrypoint}, ${core.connectorId}")
+						// TODO ths
 						start3NWebAppGUIComponent(
 							applicationContext, core.connectorId, core.appDomain, core.entrypoint,
 							newTask = false
@@ -240,6 +261,7 @@ fun start3NWebAppGUIComponent(ctx: Context, appDomain: String) {
 fun start3NWebAppGUIComponent(
 	ctx: Context, connectorId: String, appDomain: String, entrypoint: String, newTask: Boolean = true
 ) {
+	// TODO add permissions data
 	val intent = Intent(ctx, classForApp(appDomain))
 		.putExtra(CONNECTOR_ID_OF_3NWEB_APP_INSTANCE, connectorId)
 		.putExtra(APP_DOMAIN, appDomain)

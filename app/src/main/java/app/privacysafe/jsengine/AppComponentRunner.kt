@@ -40,11 +40,8 @@ class AppComponentRunner(
 	private var loadAllCode: (() -> Unit)? = null
 
 	init {
-		Log.d("w3n", "AppComponentRunner.init() on freshly created jsengine isolate, p 0")
 		portIntoCore.connectTo(makePort("core-ipc"))
-		Log.d("w3n", "AppComponentRunner.init() on freshly created jsengine isolate, p 1")
 		injectFns(*injectedFns)
-		Log.d("w3n", "AppComponentRunner.init() on freshly created jsengine isolate, p 2")
 		loadAllCode = {
 			js.loadFrom(assets, Bundled.Path.appPreload)
 			js.evaluateJavaScriptAsync("""(function(){
@@ -55,7 +52,6 @@ class AppComponentRunner(
 				);
 			})();""".trimIndent()).get()
 		}
-		Log.d("w3n", "AppComponentRunner.init() on freshly created jsengine isolate, p 3, done")
 	}
 
 	fun start() {
@@ -65,17 +61,17 @@ class AppComponentRunner(
 	}
 
 	override fun onConsoleLogMsg(msg: ConsoleMessage) {
-		val tag = "w3n-deno://$domain$entrypoint"
+		val tag = "ps-deno://$domain$entrypoint"
 		Log.i(tag, msg.message)
 	}
 
 	override fun onConsoleErrorMsg(msg: ConsoleMessage) {
-		val tag = "w3n-deno://$domain$entrypoint"
+		val tag = "ps-deno://$domain$entrypoint"
 		Log.e(tag, msg.message)
 	}
 
 	override fun onTerminated(info: TerminationInfo) {
-		val tag = "w3n-deno://$domain$entrypoint"
+		val tag = "ps-deno://$domain$entrypoint"
 		Log.e(tag, "Termination occurred: ${info.message}")
 	}
 

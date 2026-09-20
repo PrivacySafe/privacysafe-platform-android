@@ -58,7 +58,7 @@
 			android:name=".CoreRunnerService"
 			android:enabled="true"
 			android:exported="false"
-			android:foregroundServiceType="dataSync|remoteMessaging" />
+			android:foregroundServiceType="remoteMessaging" />
 
 		<activity
 			android:name=".InitActivity"

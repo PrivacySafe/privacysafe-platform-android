@@ -16,7 +16,6 @@
 */
 package app.privacysafe.jsengine.ops
 
-import android.util.Log
 import app.privacysafe.jsengine.InjectedAsyncHandler
 import app.privacysafe.jsengine.PortIntoJSEngine
 import app.privacysafe.jsengine.ops.RequestFn.Header
@@ -53,9 +52,7 @@ class RequestFn : InjectedAsyncHandler(
 	@OptIn(ExperimentalSerializationApi::class)
 	override suspend fun call(argsBytes: ByteArray): ByteArray? {
 		val req = ProtoBuf.decodeFromByteArray<RequestArgs>(argsBytes)
-//		Log.d("w3n", "=>> requesting ${req.url}")
 		val resp = sendRequest(buildRequest(req))
-//		Log.d("w3n", "=>> ${req.url} return ${resp.code}")
 		return ProtoBuf.encodeToByteArray(Reply(
 			resp.code,
 			resp.headers.filterRequested(req.responseHeaders),

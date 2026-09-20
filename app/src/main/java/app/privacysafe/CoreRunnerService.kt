@@ -73,10 +73,8 @@ class CoreRunnerService : Service() {
 		if (!this::jsrunner.isInitialized) {
 			startForeground(1, makeNewNotification())
 			jsrunner = JSRunner(applicationContext, FnsForCoreInJS())
-			Log.d("w3n", "jsrunner starts listening for user login")
 			this.deferredLogin = CompletableDeferred()
 			jsrunner.whenUserSignedIn { userId ->
-				Log.d("w3n", "jsrunner detects login of $userId")
 				loggedUserId = userId
 				this.deferredLogin?.complete(null)
 				this.deferredLogin = null
@@ -218,6 +216,10 @@ class CoreRunnerService : Service() {
 			assert((appDomain != Bundled.startupDomain) && (appDomain != Bundled.launcherDomain))
 			nonSystemAppToOpenWhenLoggedIn = appDomain
 			start3NWebAppGUIComponentInPlatformTask(applicationContext, Bundled.startupDomain)
+		}
+
+		fun findAnFocusOpenAppInstance(appDomain: String): Boolean {
+			return jsrunner.findAndFocusOpenAppInstance(appDomain)
 		}
 
 	}

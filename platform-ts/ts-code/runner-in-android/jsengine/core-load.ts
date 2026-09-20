@@ -60,6 +60,13 @@ import { makeHybridCryptor } from "./hybrid-cryptor/from-android-and-in-proc-was
   }
 
   function makePlatformResources(utilDir: string, logging: Logging): PlatformResources {
+
+    function clearLogsDirAndScheduleNextCleanup() {
+      logging.removeOlderLogs();
+      setTimeout(clearLogsDirAndScheduleNextCleanup, 3*60*60*1000);
+    }
+    clearLogsDirAndScheduleNextCleanup();
+
     return {
       caps: {
         makeAppDownloader: sysPlaces => new AppDownloader(

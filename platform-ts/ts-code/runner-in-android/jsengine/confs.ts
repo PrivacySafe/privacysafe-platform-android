@@ -52,7 +52,8 @@ export function loggerToFileAndConsole(utilDir: string): Logging {
 			console.error(msg ?? "Warning in core:\n", stringifyErr(err));
 			return loggerToFile.logWarning(err, msg);
 		},
-		recordUnhandledRejectionsInProcess: () => {}
+		recordUnhandledRejectionsInProcess: () => {},
+		removeOlderLogs: loggerToFile.removeOlderLogs
 	};
 }
 

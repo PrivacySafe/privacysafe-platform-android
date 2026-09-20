@@ -139,6 +139,21 @@ class JSRunner(
 		return components.find(connectorId) as? AppGUIComponent
 	}
 
+	fun findAndFocusOpenAppInstance(appDomain: String): Boolean {
+		val connectors = components.findFromApp(appDomain)
+		if (connectors.isNullOrEmpty()) {
+			return false
+		}
+		for (c in connectors) {
+			if (c is AppGUIComponentConnector) {
+				Log.d("w3n", "JSRunner.findAndFocusOpenAppInstance ${c.appDomain}, ${c.entrypoint}, ${c.connectorId} ")
+				c.focusActivity()
+				return true
+			}
+		}
+		return false
+	}
+
 	suspend fun launchAppFromAndroid(appDomain: String): AppGUIComponent? {
 		whenInitialized()
 		val (connectorId, entrypoint) = core.coreFns.launchAppFromAndroid(appDomain)
@@ -192,10 +207,10 @@ class JSRunner(
 			val listCoreObjPath: ListCoreObjPath = { pathJSON ->
 				listObjPath(pathJSON)
 			}
-			// TODO pass url chunk after entrypoint, as this is the way to pass parameters to startup app.
-			//      Yet, this isn't a way for commands passing to other apps, cause path messes up loading that should
-			//      occur from entrypoint, and we don't want to sanitize inputs here, instead for other apps commands
-			//      are passed via respective CAP(s).
+			// Passing url chunk after entrypoint, as this is the way to pass parameters to startup app.
+			// Yet, this isn't a way for commands passing to other apps, cause path messes up loading that should
+			// occur from entrypoint, and we don't want to sanitize inputs here, instead for other apps commands
+			// are passed via respective CAP(s).
 			val urlTailPart = if (urlHash == null) { entrypoint } else { "$entrypoint#$urlHash" }
 			return gui.setup3NWeb(appDomain, urlTailPart, appResources, ipcToCore, listCoreObjPath) { closeUI() }
 		}
@@ -301,7 +316,6 @@ class JSRunner(
 		fun makeAndStartAppDenoComponent(connectorId: String, appDomain: String, entrypoint: String) {
 			val ipcToCore = ensureUniqueIdAndMakeIpcToCore(connectorId)
 			val deno = AppComponentConnector(appDomain, entrypoint, connectorId, ipcToCore) { fnsForApp ->
-				Log.d("w3n", "Will start jsengine isolate for $appDomain$entrypoint")
 				AppComponentRunner(
 					appDomain, entrypoint,
 					readBytesFromAppCodeFS(connectorId, entrypoint).readToString(),

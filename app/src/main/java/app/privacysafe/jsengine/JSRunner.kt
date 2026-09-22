@@ -228,21 +228,39 @@ class JSRunner(
 		}
 
 		fun disconnect() {
-			if (components.remove(this)) {
-				core.coreFns.onComponentClosedInAndroid(connectorId)
-				ipcToCore.close()
-				closeActivity()
+			try {
+				if (components.remove(this)) {
+					core.coreFns.onComponentClosedInAndroid(connectorId)
+					ipcToCore.close()
+				}
+			} catch (err: Throwable) {
+				Log.d("w3n",
+					"error thrown in disconnect of activity $appDomain$entrypoint:\n${err.stackTrace.joinToString("\n")}"
+				)
 			}
 		}
 
 		fun closeActivity() {
-			if (this::closeUI.isInitialized) {
-				closeUI()
+			try {
+				if (this::closeUI.isInitialized) {
+					closeUI()
+				}
+			} catch (err: Throwable) {
+				Log.d("w3n",
+					"error thrown in closing activity $appDomain$entrypoint:\n${err.stackTrace.joinToString("\n")}"
+				)
 			}
 		}
 		fun focusActivity() {
-			if (this::focusUI.isInitialized) {
-				focusUI()
+			try {
+				if (this::focusUI.isInitialized) {
+					focusUI()
+				}
+			} catch (err: Throwable) {
+				Log.d("w3n",
+					"error thrown in focusing activity $appDomain$entrypoint:\n${err.stackTrace.joinToString("\n")}"
+				)
+				disconnect()
 			}
 		}
 

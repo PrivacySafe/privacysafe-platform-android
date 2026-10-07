@@ -241,7 +241,20 @@ fun checkMultiplePermissionsAndRegisterRequesterIfNeeded(
 	}
 }
 
-
+suspend fun showAlertDialogIn(activity: ComponentActivity, title: String, msg: String) {
+	val deferred = CompletableDeferred<Unit?>()
+	val dialog = AlertDialog.Builder(activity)
+		.setTitle(title)
+		.setMessage(msg)
+		.setOnCancelListener {
+			deferred.complete(null)
+		}
+		.setOnDismissListener {
+			deferred.complete(null)
+		}
+	dialog.show()
+	deferred.await()
+}
 
 
 

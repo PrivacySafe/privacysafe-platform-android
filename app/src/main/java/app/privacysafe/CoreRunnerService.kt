@@ -33,6 +33,7 @@ import android.util.Log
 import android.webkit.WebResourceResponse
 import android.webkit.WebView
 import androidx.core.app.NotificationCompat
+import androidx.javascriptengine.SandboxUnsupportedException
 import app.privacysafe.jsengine.AppGUIComponent
 import app.privacysafe.jsengine.JSRunner
 import app.privacysafe.jsengine.caps.CloseActivityOp
@@ -65,34 +66,42 @@ class CoreRunnerService : Service() {
 	val connectivityIndicator = ConnectivityIndicator()
 
 	override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
-
 		if (!this::notifications.isInitialized) {
 			notifications = getSystemService(NOTIFICATION_SERVICE) as NotificationManager
 			connectivityIndicator.initialize(getSystemService(CONNECTIVITY_SERVICE) as ConnectivityManager)
 		}
 		if (!this::jsrunner.isInitialized) {
 			startForeground(1, makeNewNotification())
+			deferredLogin = CompletableDeferred()
 			jsrunner = JSRunner(applicationContext, FnsForCoreInJS())
-			this.deferredLogin = CompletableDeferred()
-			jsrunner.whenUserSignedIn { userId ->
-				loggedUserId = userId
-				this.deferredLogin?.complete(null)
-				this.deferredLogin = null
-				notifications.notify(1, makeNewNotification())
-				val appToOpen = nonSystemAppToOpenWhenLoggedIn
-				nonSystemAppToOpenWhenLoggedIn = null
-				if (appToOpen != null) {
-					jsrunner.scope.launch {
-						delay(100)
-						start3NWebAppGUIComponent(applicationContext, appToOpen)
+			jsrunner.scope.launch {
+				try {
+					loggedUserId = jsrunner.whenUserSignedIn()
+					this@CoreRunnerService.deferredLogin?.complete(null)
+					this@CoreRunnerService.deferredLogin = null
+					notifications.notify(1, makeNewNotification())
+					val appToOpen = nonSystemAppToOpenWhenLoggedIn
+					nonSystemAppToOpenWhenLoggedIn = null
+					if (appToOpen != null) {
+						jsrunner.scope.launch {
+							delay(100)
+							start3NWebAppGUIComponent(applicationContext, appToOpen)
+						}
 					}
+				} catch (err: Throwable) {
+					this@CoreRunnerService.deferredLogin?.completeExceptionally(err)
+					notifications.cancel(1)
 				}
 			}
 		} else {
-			if (loggedUserId == null) {
-				notifications.notify(1, makeNewNotification())
-			} else {
-				notifications.notify(1, makeNewNotification())
+			try {
+				if (loggedUserId == null) {
+					notifications.notify(1, makeNewNotification())
+				} else {
+					notifications.notify(1, makeNewNotification())
+				}
+			} catch (err: Throwable) {
+				Log.e("w3n", "Fail to set main notification item", err)
 			}
 		}
 		// service with core is a backbone of everything, hence it must run
@@ -106,7 +115,7 @@ class CoreRunnerService : Service() {
 			.setPriority(NotificationCompat.PRIORITY_LOW)
 			if (loggedUserId == null) {
 				notifBuild
-					.setContentText("Tap to Login")
+					.setContentText(resources.getString(R.string.tap_to_login_notification_txt))
 					.setContentIntent(intentToOpenStartUpFromNotification(applicationContext))
 			} else {
 				notifBuild
@@ -154,6 +163,14 @@ class CoreRunnerService : Service() {
 
 		lateinit var closeActivity: () -> Unit
 
+		suspend fun whenJSRunnerInitialized() {
+			return jsrunner.whenInitialized()
+		}
+
+		fun exit() {
+			stopSelf()
+		}
+
 		fun setUICallbacks(
 			close: () -> Unit
 		) {
@@ -175,7 +192,6 @@ class CoreRunnerService : Service() {
 			// this implicitly is a call to core to start login.
 			start3NWebAppStartupGUIComponentInPlatformTask(applicationContext, startupUrlHash)
 		}
-
 
 	}
 
@@ -476,6 +492,8 @@ class ConnectivityIndicator(
 		mng = m
 		m.registerDefaultNetworkCallback(this)
 	}
+
+	val initialized get() = this::mng.isInitialized
 
 	fun hasAvailableNetwork(): Boolean {
 		return (availableNetwork != null)

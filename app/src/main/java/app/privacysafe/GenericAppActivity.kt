@@ -58,9 +58,11 @@ abstract class GenericAppActivity() : ComponentActivity() {
 			finishAndRemoveTask()
 		}
 		appSrvConn = conn
-		val permissionRequester = checkMultiplePermissionsAndRegisterRequesterIfNeeded(
-			this, Permission.RECORD_AUDIO, Permission.CAMERA,
-		)
+		val permissionRequester = if (appDomain == Bundled.chatDomain) {
+			checkMultiplePermissionsAndRegisterRequesterIfNeeded(
+				this, Permission.RECORD_AUDIO, Permission.CAMERA,
+			)
+		} else { null }
 
 		// TODO
 		//  - info about required permissions should be available here

@@ -10,4 +10,20 @@
 	<string name="storage_app_name">Storage</string>
 	<string name="inbox_app_name">Inbox</string>
 	<string name="treasure_app_name">Treasure</string>
+
+	<string name="tap_to_login_notification_txt">Tap to Login</string>
+
+	<string name="notification_perm_dialog_title">Missing permission</string>
+	<string name="notification_perm_dialog_message">Need permission to run</string>
+
+	<string name="missing_sandbox_dialog_title">Older Android system</string>
+	<string name="missing_sandbox_dialog_message">
+		Android system does not have an important feature, JavaScriptSandbox, to run PrivacySafe code. Update your
+		device, or use another one.
+	</string>
+
+	<string name="start_err_dialog_title">Something went wrong</string>
+	<string name="start_err_dialog_message">
+		Unexpect error prevents PrivacySafe from starting up
+	</string>
 </resources>

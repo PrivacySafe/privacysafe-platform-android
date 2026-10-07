@@ -21,18 +21,24 @@ import android.content.Context
 import android.content.Intent
 import android.os.Bundle
 import androidx.activity.ComponentActivity
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 
 class SystemDialogActivity : ComponentActivity() {
+
+	private val scope = CoroutineScope(Dispatchers.Main)
 
 	override fun onCreate(savedInstanceState: Bundle?) {
 		super.onCreate(savedInstanceState)
 		setContentView(R.layout.system_dialogs_layout)
-		val dialog = AlertDialog.Builder(this)
-			.setTitle(intent.extras?.getString(DIALOG_TITLE) ?: "")
-			.setMessage(intent.extras?.getString(DIALOG_CONTENT) ?: "")
-			.setOnCancelListener { finish() }
-			.setOnDismissListener { finish() }
-		dialog.show()
+		scope.launch {
+			showAlertDialogIn(
+				this@SystemDialogActivity,
+				intent.extras?.getString(DIALOG_TITLE) ?: "",
+				intent.extras?.getString(DIALOG_CONTENT) ?: ""
+			)
+		}
 	}
 
 }

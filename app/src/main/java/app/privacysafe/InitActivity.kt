@@ -17,16 +17,16 @@
 package app.privacysafe
 
 import android.app.NotificationManager
-import android.content.Context.NOTIFICATION_SERVICE
 import android.content.Intent
 import android.content.ServiceConnection
 import android.os.Bundle
 import android.util.Log
 import androidx.activity.ComponentActivity
+import androidx.javascriptengine.SandboxUnsupportedException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import kotlin.system.exitProcess
 
 class InitActivity : ComponentActivity() {
 
@@ -45,13 +45,16 @@ class InitActivity : ComponentActivity() {
 
 		scope.launch {
 			val havePermissions = if (permissionRequester == null) { true } else { permissionRequester() }
-			if (havePermissions) {
-				addCoreRunnerNotificationChannelTo(applicationContext, notifications)
-				startCoreRunnerService(applicationContext)
-				startCoreServiceAndForwardToSystemApp()
-			} else {
-				finishAndRemoveTask()
+			if (!havePermissions) {
+				showAlertDialogIn(
+					this@InitActivity,
+					resources.getString(R.string.notification_perm_dialog_title),
+					resources.getString(R.string.notification_perm_dialog_message)
+				)
 			}
+			addCoreRunnerNotificationChannelTo(applicationContext, notifications)
+			startCoreRunnerService(applicationContext)
+			startCoreServiceAndForwardToSystemApp()
 		}
 	}
 
@@ -78,6 +81,7 @@ class InitActivity : ComponentActivity() {
 		coreSrvConn = conn
 		scope.launch {
 			core = coreDef.await()
+			ensureJSRunnerRunningOrExitProcess(core)
 			core.setUICallbacks(
 				close = { finish() }
 			)
@@ -93,6 +97,27 @@ class InitActivity : ComponentActivity() {
 			}
 			finishAndRemoveTask()
 		}
+	}
+
+	private suspend fun ensureJSRunnerRunningOrExitProcess(core: CoreInit) {
+		try {
+			core.whenJSRunnerInitialized()
+			return
+		} catch (_: SandboxUnsupportedException) {
+			showAlertDialogIn(
+				this@InitActivity,
+				resources.getString(R.string.missing_sandbox_dialog_title),
+				resources.getString(R.string.missing_sandbox_dialog_message)
+			)
+		} catch (err: Throwable) {
+			showAlertDialogIn(
+				this@InitActivity,
+				resources.getString(R.string.start_err_dialog_title),
+				"${resources.getString(R.string.start_err_dialog_message)}\n${err.stackTraceToString()}"
+			)
+		}
+		finishAndRemoveTask()
+		core.exit()
 	}
 
 	override fun onDestroy() {

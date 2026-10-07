@@ -74,24 +74,30 @@ class JSRunner(
 	private val components = Components()
 
 	init {
+
 		executor.execute {
-			jsBox = JavaScriptSandbox.createConnectedInstanceAsync(ctx).get()
-			jsHas = JsHas(
-				jsBox.isFeatureSupported(JS_FEATURE_MESSAGE_PORTS),
-				jsBox.isFeatureSupported(JS_FEATURE_PROVIDE_CONSUME_ARRAY_BUFFER),
-				jsBox.isFeatureSupported(JS_FEATURE_WASM_COMPILATION),
-				jsBox.isFeatureSupported(JS_FEATURE_ISOLATE_MAX_HEAP_SIZE),
-				jsBox.isFeatureSupported(JS_FEATURE_ISOLATE_TERMINATION)
-			)
-			Log.d("w3n", "jsHas is $jsHas")
-			val dataDir = ctx.dataDir.absolutePath
-			core = CoreRunner(
-				makeAndConfigureNewIsolate(jsHas), jsHas,
-				makeCoreInjectedFns(uiFns, Path(dataDir), assets, Executors.newFixedThreadPool(NUM_OF_CRYPTOR_THREADS)),
-				assets, executor, scope, dataDir
-			)
-			whenCoreSet!!.complete(core)
-			whenCoreSet = null
+			try {
+				jsBox = JavaScriptSandbox.createConnectedInstanceAsync(ctx).get()
+				jsHas = JsHas(
+					jsBox.isFeatureSupported(JS_FEATURE_MESSAGE_PORTS),
+					jsBox.isFeatureSupported(JS_FEATURE_PROVIDE_CONSUME_ARRAY_BUFFER),
+					jsBox.isFeatureSupported(JS_FEATURE_WASM_COMPILATION),
+					jsBox.isFeatureSupported(JS_FEATURE_ISOLATE_MAX_HEAP_SIZE),
+					jsBox.isFeatureSupported(JS_FEATURE_ISOLATE_TERMINATION)
+				)
+				Log.d("w3n", "jsHas is $jsHas")
+				val dataDir = ctx.dataDir.absolutePath
+				core = CoreRunner(
+					makeAndConfigureNewIsolate(jsHas), jsHas,
+					makeCoreInjectedFns(uiFns, Path(dataDir), assets, Executors.newFixedThreadPool(NUM_OF_CRYPTOR_THREADS)),
+					assets, executor, scope, dataDir
+				)
+				whenCoreSet!!.complete(core)
+				whenCoreSet = null
+			} catch (err: Throwable) {
+				Log.d("w3n", "\n ------------------------- \n JSRunner.runner: \n${err.stackTraceToString()}")
+				whenCoreSet?.completeExceptionally(err)
+			}
 		}
 	}
 
@@ -108,12 +114,9 @@ class JSRunner(
 		executor.shutdown()
 	}
 
-	fun whenUserSignedIn(run: (userId: String) -> Unit) {
-		scope.launch {
-			whenInitialized()
-			val userId = core.coreFns.getSignedUserIdEventually()
-			run(userId)
-		}
+	suspend fun whenUserSignedIn(): String {
+		whenInitialized()
+		return core.coreFns.getSignedUserIdEventually()
 	}
 
 	suspend fun whenInitialized() {

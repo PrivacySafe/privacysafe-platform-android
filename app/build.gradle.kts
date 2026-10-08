@@ -2,7 +2,6 @@ import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 
 plugins {
   alias(libs.plugins.android.application)
-  alias(libs.plugins.kotlin.android)
   alias(libs.plugins.kotlin.compose)
   kotlin("plugin.serialization") version "2.3.20"
 }
@@ -98,49 +97,25 @@ android {
     targetCompatibility = JavaVersion.VERSION_11
   }
 
-  kotlin {
-    compilerOptions {
-      jvmTarget = JvmTarget.JVM_11
-    }
-  }
-
   buildFeatures {
     compose = true
   }
 
-  // === Task(s) to build non-Android things before Android's build
-
-  // to patch PATH variable during build, add into this file addition to PATH variable
-  val pathVarPatchFilePath = "app/env-path-addition"
-  val envPATH = try {
-    val patch = File(pathVarPatchFilePath).readText()
-    val initPATH = System.getenv("PATH")
-    "$patch:$initPATH"
-  } catch (e: Throwable) {
-    println("Will use unpatched PATH variable, cause lookup for patch file $pathVarPatchFilePath fails:\n$e")
-    null
-  }
+  // === Task(s) to copy bundle things before Android's build
 
   val tsProjPath = "../platform-ts"
   val assetsPath = "src/main/assets"
 
-  val makeJSBundles = "makeJSBundles"
-  tasks.register<Exec>(makeJSBundles) {
-    workingDir(tsProjPath)
-    // we use bash, cause it looks into PATH to find npm, node, and whatever else needed
-    commandLine("bash", "-c", "npm run compile all")
-    if (envPATH != null) {
-      environment("PATH", envPATH)
-    }
-  }
-
   fun registerCopyTask(taskName: String, src: String, dst: String, vararg includes: String) {
     val clearingTask = "clearBefore$taskName"
+    //noinspection WrongGradleMethod
     tasks.register<Delete>(clearingTask) {
-      dependsOn(makeJSBundles)
-      delete(dst)
+      description = "Clear $dst before copying stuff from $src"
+			delete(dst)
     }
+    //noinspection WrongGradleMethod
     tasks.register<Copy>(taskName) {
+      description = "Copies contents of $src into $dst"
       dependsOn(clearingTask)
       from(src) {
         include(*includes)

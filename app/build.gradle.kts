@@ -90,6 +90,7 @@ android {
         isMinifyEnabled = false
       }
     }
+    base.archivesName = "${rootProject.name.trim()}-${defaultConfig.versionName}"
   }
 
   compileOptions {

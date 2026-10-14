@@ -33,7 +33,7 @@ android {
   fun enableR8inBuild(): Boolean {
     val enableR8NameFile = "app/enable-r8-minifications"
     val flag = try {
-      File(enableR8NameFile).readText().trim()
+      rootProject.projectDir.toPath().resolve(enableR8NameFile).toFile().readText().trim()
     } catch (_: Throwable) {
       println("File $enableR8NameFile not found")
       return false

@@ -13,7 +13,7 @@ android {
   fun readVersionCodeFromFileOr(testVersion: Int): Int {
     val versionCodeFile = "app/version-code"
     return try {
-      File(versionCodeFile).readText().trim().toInt()
+      rootProject.projectDir.toPath().resolve(versionCodeFile).toFile().readText().trim().toInt()
     } catch (_: Throwable) {
       println("Version code wasn't read from file $versionCodeFile, using default value $testVersion")
       testVersion
@@ -23,7 +23,7 @@ android {
   fun readVersionNameFromFileOr(testVersion: String): String {
     val versionNameFile = "app/version-name"
     return try {
-      File(versionNameFile).readText()
+      rootProject.projectDir.toPath().resolve(versionNameFile).toFile().readText()
     } catch (_: Throwable) {
       println("Version name wasn't read from file $versionNameFile, using default value $testVersion")
       testVersion

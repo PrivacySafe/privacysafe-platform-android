@@ -30,16 +30,17 @@ android {
     }
   }
 
-  fun enableR8inBuild(): Boolean {
-    val enableR8NameFile = "app/enable-r8-minifications"
-    val flag = try {
-      rootProject.projectDir.toPath().resolve(enableR8NameFile).toFile().readText().trim()
-    } catch (_: Throwable) {
-      println("File $enableR8NameFile not found")
-      return false
-    }
-    return (flag == "true")
-  }
+//  Making R8 permanent in release
+//  fun enableR8inBuild(): Boolean {
+//    val enableR8NameFile = "app/enable-r8-minifications"
+//    val flag = try {
+//      rootProject.projectDir.toPath().resolve(enableR8NameFile).toFile().readText().trim()
+//    } catch (_: Throwable) {
+//      println("File $enableR8NameFile not found")
+//      return false
+//    }
+//    return (flag == "true")
+//  }
 
   defaultConfig {
     applicationId = "app.privacysafe"
@@ -78,16 +79,11 @@ android {
         println("Key file is not found, and signing is not enabled for this release build")
       }
       isDebuggable = false
-      if (enableR8inBuild()) {
-        println("R8 optimizations and minifications are enabled for this release build")
-        isMinifyEnabled = true
-        isShrinkResources = true
-        optimization {
-          enable = true
-        }
-      } else {
-        println("R8 optimizations and minifications are not enabled for this release build")
-        isMinifyEnabled = false
+      println("R8 optimizations and minifications are enabled for this release build")
+      isMinifyEnabled = true
+      isShrinkResources = true
+      optimization {
+        enable = true
       }
     }
     base.archivesName = "${rootProject.name.trim()}-${defaultConfig.versionName}"

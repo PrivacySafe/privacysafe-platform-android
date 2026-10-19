@@ -75,7 +75,9 @@ export async function sysFilesOnDevice(): Promise<FSItem> {
 }
 
 export const dohURLs = [
-	`https://dns.quad9.net/dns-query`,
-	`https://doh.libredns.gr/dns-query`,
-	`https://doh.applied-privacy.net/query`
+	`https://cloudflare-dns.com/dns-query`,
+	`https://dns.google/resolve`,
+	// `https://dns.quad9.net/dns-query`,
+	// `https://doh.libredns.gr/dns-query`,
+	// `https://doh.applied-privacy.net/query`
 ];

@@ -17,19 +17,15 @@
 package app.privacysafe
 
 import android.Manifest
+import android.app.ActivityManager
 import android.app.AlertDialog
 import android.content.Context
 import android.content.pm.PackageManager
-import android.util.Log
 import android.webkit.PermissionRequest
 import androidx.activity.ComponentActivity
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.core.app.ActivityCompat
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.ExperimentalCoroutinesApi
-import kotlinx.coroutines.awaitAll
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import java.io.BufferedReader
 import java.io.InputStream
@@ -254,6 +250,29 @@ suspend fun showAlertDialogIn(activity: ComponentActivity, title: String, msg: S
 		}
 	dialog.show()
 	deferred.await()
+}
+
+fun ActivityManager.findRunningTaskWithApp(appDomain: String): ActivityManager.AppTask? {
+	return this.appTasks.find { t ->
+		t.taskInfo.isRunning && (t.taskInfo.baseIntent.extras?.getString(APP_DOMAIN) ==	appDomain)
+	}
+}
+
+fun ActivityManager.findRunningTaskWithAppInstance(appDomain: String, connectorId: String): ActivityManager
+.AppTask? {
+	return this.appTasks.find { t ->
+		t.taskInfo.isRunning &&
+			(t.taskInfo.baseIntent.extras?.getString(APP_DOMAIN) ==	appDomain) &&
+			(t.taskInfo.baseIntent.extras?.getString(CONNECTOR_ID_OF_3NWEB_APP_INSTANCE) ==	connectorId)
+	}
+}
+
+fun Context.getActivityManager(): ActivityManager {
+	return getSystemService(Context.ACTIVITY_SERVICE) as ActivityManager
+}
+
+fun Context.customIntentAction(action: String): String {
+	return "${this.packageName}/$action"
 }
 
 

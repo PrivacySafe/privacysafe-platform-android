@@ -274,8 +274,7 @@ class CoreRunnerService : Service() {
 		}
 
 		val exitAll: ExitAllOp = {
-			// TODO should we remove notifications, as it gets restarted after process closing
-			//  - should we do cleaner closing: ask all nicely, and then do rough exit
+			this@CoreRunnerService.stopSelf()
 			exitProcess(0)
 		}
 

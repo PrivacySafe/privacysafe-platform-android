@@ -17,22 +17,20 @@
 
 import { makeRuntimeException } from "../../../lib-common/exceptions/runtime";
 import { assert } from "../../../lib-common/assert";
-import { RequestFn } from "core-3nweb-client-lib/build/lib-client/request-utils";
+import { NetClient } from "core-3nweb-client-lib/build/lib-client/request-utils";
 
 type AppDistributionList = web3n.system.apps.AppDistributionList;
 type DistChannels = web3n.system.apps.DistChannels;
 
-export async function getJson<T>(url: string, request: RequestFn<unknown>): Promise<T|undefined> {
-	const rep = await (request as RequestFn<T>)({
-		method: 'GET', url, responseType: 'json'
-	});
+export async function getJson<T>(url: string, net: NetClient): Promise<T|undefined> {
+	const rep = await net.doBodylessRequest<T>({ method: 'GET', url, responseType: 'json' });
 	return ((rep.status === 200) ? rep.data : undefined);
 }
 
 export async function appChannels(
-	appPlatfUrl: string, appDomain: string, request: RequestFn<unknown>
+	appPlatfUrl: string, appDomain: string, net: NetClient
 ): Promise<DistChannels> {
-	const channels = await getJson<DistChannels>(`${appPlatfUrl}/channels`, request);
+	const channels = await getJson<DistChannels>(`${appPlatfUrl}/channels`, net);
 	if (channels && (typeof channels.channels === 'object')) {
 		return channels;
 	} else {
@@ -46,11 +44,11 @@ function isNonEmptyStringArr(arr: string[]): boolean {
 }
 
 export async function listChannelVersions(
-	appPlatfUrl: string, appDomain: string, channel: string, request: RequestFn<unknown>
+	appPlatfUrl: string, appDomain: string, channel: string, net: NetClient
 ): Promise<string[]> {
 	assert((typeof channel === 'string') && (channel.length > 0),
 		`Invalid channel: ${channel}`);
-	const versions = await getJson<string[]>(`${appPlatfUrl}/${channel}.list`, request);
+	const versions = await getJson<string[]>(`${appPlatfUrl}/${channel}.list`, net);
 	if (versions && isNonEmptyStringArr(versions)) {
 		return versions;
 	} else {
@@ -59,11 +57,11 @@ export async function listChannelVersions(
 }
 
 export async function channelLatestVersion(
-	appPlatfUrl: string, appDomain: string, channel: string, request: RequestFn<unknown>
+	appPlatfUrl: string, appDomain: string, channel: string, net: NetClient
 ): Promise<string> {
 	assert((typeof channel === 'string') && (channel.length > 0),
 		`Invalid channel: ${channel}`);
-	const latest = await getJson<string>(`${appPlatfUrl}/${channel}.latest`, request);
+	const latest = await getJson<string>(`${appPlatfUrl}/${channel}.latest`, net);
 	if (latest && (typeof latest === 'string')) {
 		return latest;
 	} else {
@@ -72,12 +70,12 @@ export async function channelLatestVersion(
 }
 
 export async function listAppVersionPacks(
-	appPlatfUrl: string, appDomain: string, version: string, request: RequestFn<unknown>
+	appPlatfUrl: string, appDomain: string, version: string, net: NetClient
 ): Promise<{ listInAppVersion: AppDistributionList; appVersionUrl: string; }> {
 	assert((typeof version === 'string') && (version.length > 0),
 		`Invalid version: ${version}`);
 	const appVersionUrl = `${appPlatfUrl}/${version}`;
-	const lst = await getJson<AppDistributionList>(`${appVersionUrl}/list`, request);
+	const lst = await getJson<AppDistributionList>(`${appVersionUrl}/list`, net);
 	if (lst && (typeof lst === 'object')) {
 		return { appVersionUrl, listInAppVersion: lst };
 	} else {
@@ -100,8 +98,7 @@ export interface AppDownloadException extends web3n.RuntimeException {
 export function makeAppDownloadExc(
 	appDomain: string, flags: Partial<AppDownloadException>, cause?: any
 ): AppDownloadException {
-	return makeRuntimeException<AppDownloadException>(
-		'app-download', { appDomain, cause }, flags);
+	return makeRuntimeException<AppDownloadException>('app-download', { appDomain, cause }, flags);
 }
 
 

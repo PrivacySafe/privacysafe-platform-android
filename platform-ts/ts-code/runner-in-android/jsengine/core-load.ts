@@ -25,8 +25,8 @@ import { InitProc } from "../init-proc";
 import { makeCoreDriver } from "../../platform/core";
 import { makeSystemPlaces } from "./caps/system-places";
 import { AppDownloader } from "../../platform/caps/system/apps-downloader";
-import type { DnsResolver } from "core-3nweb-client-lib/build/lib-client/service-locator";
-import { appDirs, dohAt, makeNetClient, makeServiceLocator } from "core-3nweb-client-lib";
+import { wrapNetworkFns } from "core-3nweb-client-lib/build/lib-client/networks";
+import { appDirs, dohAt } from "core-3nweb-client-lib";
 import { deviceFormFactor, dohURLs, LAUNCHER_APP_DOMAIN, loggerToFileAndConsole, makeUICap, SIGNUP_URL, sysFilesOnDevice } from "./confs";
 import { makeRequestFromAndroid } from "./ops/request";
 import { makeRandom } from "./ops/random";
@@ -50,11 +50,18 @@ import { makeHybridCryptor } from "./hybrid-cryptor/from-android-and-in-proc-was
 
   const { requestFromAndroid, openServiceEventsSource } = makeRequestFromAndroid();
 
-  const dnsResolvers: DnsResolver[] = [
-	...dohURLs.map(url => dohAt(requestFromAndroid, url))
+  const dnsResolvers = [
+    ...dohURLs.map(({ url, type }) => dohAt(requestFromAndroid, url, type))
   ];
 
-  
+  const { makeNet: makeNetClient, makeLocator: makeServiceLocator } = wrapNetworkFns({
+    regular: {
+      requests: requestFromAndroid,
+      openServiceEventsSource,
+      naming: dnsResolvers
+    }
+  });
+
   async function sha512(bytes: Buffer): Promise<string> {
     return (hashing.sha512.hash(bytes) as any).toBase64();
   }
@@ -70,7 +77,7 @@ import { makeHybridCryptor } from "./hybrid-cryptor/from-android-and-in-proc-was
     return {
       caps: {
         makeAppDownloader: sysPlaces => new AppDownloader(
-          sysPlaces, requestFromAndroid, dnsResolvers, logging.logError, sha512
+          sysPlaces, makeServiceLocator('w3nApp', logging.logError), makeNetClient(), sha512
         ),
         makeAutoStartupCAP,
         makeConnectivity,
@@ -93,8 +100,8 @@ import { makeHybridCryptor } from "./hybrid-cryptor/from-android-and-in-proc-was
       // makeCryptor: makeInProcessWasmCryptor,
       makeCryptor: makeHybridCryptor,
       random: makeRandom(),
-      makeNetClient: () => makeNetClient(requestFromAndroid, openServiceEventsSource),
-      makeServiceLocator: makeServiceLocator(...dnsResolvers),
+      makeNetClient,
+      makeServiceLocator,
       makeUserLogin: (userId, getKeyFromPass) => UserLogin.make(
         utilDir, logging.logError, userId, getKeyFromPass
       ),

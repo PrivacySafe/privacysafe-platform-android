@@ -15,15 +15,13 @@
  this program. If not, see <http://www.gnu.org/licenses/>.
 */
 
-import { getAppLocation } from "./app-package-locator";
 import { from, Observable, Subject } from "rxjs";
 import { mergeMap } from "rxjs/operators";
 import { appChannels, channelLatestVersion, listAppVersionPacks, getJson, makeAppDownloadExc } from "./download-resources";
 import { toRxObserver } from "../../../lib-common/utils-for-observables";
 import type { SystemPlaces } from "../system-places";
-import type { DnsResolver } from "core-3nweb-client-lib/build/lib-client/service-locator";
-import { Logging } from "../../../inject-defs/confs";
-import { RequestFn } from "core-3nweb-client-lib/build/lib-client/request-utils";
+import { NetClient, RequestFn } from "core-3nweb-client-lib/build/lib-client/request-utils";
+import { ServiceLocator } from "core-3nweb-client-lib/build/lib-client/networks";
 
 type DownloadProgress = web3n.system.apps.DownloadProgress;
 type Observer<T> = web3n.Observer<T>;
@@ -39,9 +37,8 @@ export class AppDownloader {
 
 	constructor(
 		private readonly sysPlaces: SystemPlaces,
-		private readonly request: RequestFn<unknown>,
-		private readonly dnsResolvers: DnsResolver[],
-		private readonly logError: Logging['logError'],
+		private readonly locator: ServiceLocator,
+		private readonly net: NetClient,
 		private readonly hashSha512: HashSha512
 	) {
 		Object.seal(this);
@@ -49,7 +46,7 @@ export class AppDownloader {
 
 	private async getAppUrl(id: string): Promise<string> {
 		try {
-			const appBaseUrl = await getAppLocation(id, this.dnsResolvers, this.logError);
+			const appBaseUrl = await this.locator(`@${id}`);
 			return appBaseUrl;
 		} catch (exc) {
 			throw makeAppDownloadExc(id, { dnsErr: true }, exc);
@@ -58,25 +55,21 @@ export class AppDownloader {
 
 	async getAppChannels(id: string): Promise<DistChannels> {
 		const appUrl = await this.getAppUrl(id);
-		return appChannels(appUrl, id, this.request);
+		return appChannels(appUrl, id, this.net);
 	}
 
 	async getLatestAppVersion(id: string, channel: string): Promise<string> {
 		const appUrl = await this.getAppUrl(id);
-		return channelLatestVersion(appUrl, id, channel, this.request);
+		return channelLatestVersion(appUrl, id, channel, this.net);
 	}
 
-	async getAppVersionFilesList(
-		id: string, version: string
-	): Promise<AppVersionPacks> {
+	async getAppVersionFilesList(id: string, version: string): Promise<AppVersionPacks> {
 		const appUrl = await this.getAppUrl(id);
-		const { listInAppVersion } = await listAppVersionPacks(appUrl, id, version, this.request);
+		const { listInAppVersion } = await listAppVersionPacks(appUrl, id, version, this.net);
 		return listInAppVersion;
 	}
 
-	downloadWebApp(
-		id: string, version: string, observer: Observer<DownloadProgress>
-	): () => void {
+	downloadWebApp(id: string, version: string, observer: Observer<DownloadProgress>): () => void {
 		const sub = from(this.startDownloadProc(id, version))
 		.pipe(mergeMap(proc => proc))
 		.subscribe(toRxObserver(observer));
@@ -89,17 +82,15 @@ export class AppDownloader {
 		const appUrl = await this.getAppUrl(id);
 		const {
 			appVersionUrl, listInAppVersion
-		} = await listAppVersionPacks(appUrl, id, version, this.request);
+		} = await listAppVersionPacks(appUrl, id, version, this.net);
 		const fName = getUnpackedFolder(listInAppVersion);
 		if (!fName) { throw makeAppDownloadExc(id, { noUnpackedVariant: true }); }
 		const unpackedAppUrl = `${appVersionUrl}/${fName}`;
-		const content = await appVersionContent(id, unpackedAppUrl, this.request);
+		const content = await appVersionContent(id, unpackedAppUrl, this.net);
 		return { content, unpackedAppUrl };
 	}
 
-	private async startDownloadProc(
-		id: string, version: string
-	): Promise<Observable<DownloadProgress>> {
+	private async startDownloadProc(id: string, version: string): Promise<Observable<DownloadProgress>> {
 		const procObs = new Subject<DownloadProgress>();
 		this.locateUnpackedApp(id, version)
 		.then(async ({ content, unpackedAppUrl }) => {
@@ -128,9 +119,7 @@ export class AppDownloader {
 						currentFileSize: entry.size,
 						fileInProgress: entry.file
 					});
-					const fileBytes = await downloadAndCheck(
-						id, unpackedAppUrl, entry, this.request as RequestFn<Buffer>, this.hashSha512
-					);
+					const fileBytes = await downloadAndCheck(id, unpackedAppUrl, entry, this.net, this.hashSha512);
 					await dir.writeBytes(entry.file, fileBytes);
 					filesLeft -= 1;
 					bytesLeft -= entry.size;
@@ -174,10 +163,8 @@ export interface ContentFileInfo {
 
 const CONTENT_FNAME = 'content.json';
 
-async function appVersionContent(
-	appDomain: string, unpackedAppUrl: string, request: RequestFn<unknown>
-): Promise<AppContent> {
-	const content = await getJson<AppContent>(`${unpackedAppUrl}/${CONTENT_FNAME}`, request);
+async function appVersionContent(appDomain: string, unpackedAppUrl: string, net: NetClient): Promise<AppContent> {
+	const content = await getJson<AppContent>(`${unpackedAppUrl}/${CONTENT_FNAME}`, net);
 	if (content && Array.isArray(content.content)) {
 		return content;
 	} else {
@@ -186,12 +173,10 @@ async function appVersionContent(
 }
 
 async function downloadAppFile(
-	appDomain: string, unpackedAppUrl: string, file: string, request: RequestFn<Buffer>
+	appDomain: string, unpackedAppUrl: string, file: string, net: NetClient
 ): Promise<Buffer> {
-	const rep = await request({
-		method: 'GET',
-		url: `${unpackedAppUrl}/${file}`,
-		responseType: 'arraybuffer'
+	const rep = await net.doBodylessRequest<Buffer>({
+		method: 'GET', url: `${unpackedAppUrl}/${file}`, responseType: 'arraybuffer'
 	});
 	if (rep.status === 200) {
 		return rep.data;
@@ -202,14 +187,13 @@ async function downloadAppFile(
 }
 
 async function downloadAndCheck(
-	appDomain: string, unpackedAppUrl: string, info: ContentFileInfo, request: RequestFn<Buffer>,
-	hashSha512: HashSha512
+	appDomain: string, unpackedAppUrl: string, info: ContentFileInfo, net: NetClient, hashSha512: HashSha512
 ): Promise<Uint8Array> {
 	if (!info.sha512) { throw makeAppDownloadExc(
 		appDomain, { badAppFile: true },
 		`No expected sha512 for file ${info.file}`
 	); }
-	const fileContent = await downloadAppFile(appDomain, unpackedAppUrl, info.file, request);
+	const fileContent = await downloadAppFile(appDomain, unpackedAppUrl, info.file, net);
 	if (fileContent.length !== info.size) {
 		throw makeAppDownloadExc(
 			appDomain, { badAppFile: true },

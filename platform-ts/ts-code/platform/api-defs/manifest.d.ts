@@ -32,6 +32,25 @@ declare namespace web3n.caps {
 		description: string;
 		icon: string;
 		/**
+		 * Optional application classification tags. Tag values are intentionally
+		 * open-ended so new tags don't require a manifest format change.
+		 */
+		tags?: string[];
+		/** Publisher/distributor of the application. */
+		publisher?: string;
+		/** Primary application website URL. */
+		website?: string;
+		/** Support or other application-related contact information. */
+		contact?: string;
+		/** Privacy policy URL. */
+		policy?: string;
+		/** Terms of Service / Terms of Use URL. */
+		terms?: string;
+		/** SPDX license identifier or expression. */
+		license?: string;
+		/** Canonical source-code repository or source distribution URL. */
+		source?: string;
+		/**
 		 * components object enumerates all components of the app. Keys are
 		 * entrypoint paths within app folder. Respective values are definitions.
 		 */

@@ -44,17 +44,21 @@ export class StartupAppInAndroid implements StartupApp {
 		startProc: Promise<void>;
 		coreInit: Promise<void>;
 	} {
+    console.log(`StartupAppInAndroid.instantiate(), p 1`);
 		const { capsForStartup, coreInit } = startCore();
     const startProc = appManifestOnDev(STARTUP_APP_DOMAIN)
     .then(async manifest => {
+      console.log(`StartupAppInAndroid.instantiate(), p 2, manifest read`);
       const launchers = getLaunchersForUser(manifest, deviceFormFactor());
 			const entrypoint = launchers?.[0]?.component || MAIN_GUI_ENTRYPOINT;
       const { connectorId, setComponent } = provideW3NForActivity(capsForStartup as StartupW3N);
       startupApp.connectorId = connectorId;
+      console.log(`StartupAppInAndroid.instantiate(), p 3`);
       setComponent({
         connectorId, entrypoint, appRoot: undefined as any,
         close: () => startupApp.close()
       });
+      console.log(`StartupAppInAndroid.instantiate(), p 4, component was set`);
     });
     const startupApp = new StartupAppInAndroid();
     return { coreInit, startProc, startupApp };

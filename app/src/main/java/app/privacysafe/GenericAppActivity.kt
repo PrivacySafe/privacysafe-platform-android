@@ -75,8 +75,10 @@ abstract class GenericAppActivity() : ComponentActivity() {
 				permissionRequester()
 			}
 
+			Log.d("w3n", "GenericAppActivity.onCreate() for $appDomain, p 0")
 			val coreSrv = coreDef.await()
 
+			Log.d("w3n", "GenericAppActivity.onCreate() for $appDomain, p 1")
 			if (coreSrv.isUserLoggedIn) {
 				if (appDomain == Bundled.startupDomain) {
 					coreSrv.openLauncher()
@@ -96,7 +98,9 @@ abstract class GenericAppActivity() : ComponentActivity() {
 			}
 
 			try {
+				Log.d("w3n", "GenericAppActivity.onCreate() for $appDomain, p 2")
 				val componentSrv = coreSrv.getConnectorToCore(appDomain, connectorId, entrypoint)
+				Log.d("w3n", "GenericAppActivity.onCreate() for $appDomain, p 3")
 				if (componentSrv == null) {
 					coreSrv.awaitLoginInProgress()
 					start3NWebAppGUIComponentInPlatformTask(applicationContext, Bundled.launcherDomain)
@@ -106,6 +110,7 @@ abstract class GenericAppActivity() : ComponentActivity() {
 				core = componentSrv
 
 				// TODO service method to get dynamically app info from its manifest, name, icon, etc.
+				Log.d("w3n", "GenericAppActivity.onCreate() for $appDomain, p 4")
 
 				core.setUICallbacks(
 					close = { finishAndRemoveTask() },
@@ -118,6 +123,7 @@ abstract class GenericAppActivity() : ComponentActivity() {
 						)
 					}
 				)
+				Log.d("w3n", "GenericAppActivity.onCreate() for $appDomain, p 5")
 				setContentView(R.layout.w3n_app_layout)
 				val gui = findViewById<WebView>(R.id.app_gui)
 				bindToAndroidBackButtonTo(gui)
@@ -126,6 +132,7 @@ abstract class GenericAppActivity() : ComponentActivity() {
 				val load = core.attachGUI(gui, urlHash)
 				load()
 				core.setActive(true)
+				Log.d("w3n", "GenericAppActivity.onCreate() for $appDomain, p 6")
 			} catch (err: Throwable) {
 				Log.e(
 					"w3n",

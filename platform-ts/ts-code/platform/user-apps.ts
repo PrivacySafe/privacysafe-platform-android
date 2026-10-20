@@ -194,18 +194,23 @@ export class UserApps {
 			startupApp: StartupApp; startProc: Promise<void>; coreInit: Promise<void>;
 		}
 	): Promise<{ init: Promise<boolean>; }> {
+    console.log(`UserApps.setStartupAppProcess(), p 1`);
 		if (this.core.isStarted() || this.startupApp) {
 			throw new Error(`Startup was already started`);
 		}
+    console.log(`UserApps.setStartupAppProcess(), p 2`);
 		const { coreInit, startProc, startupApp } = instantiate(this.core.start.bind(this.core));
 		this.startupApp = startupApp;
+    console.log(`UserApps.setStartupAppProcess(), p 3`);
 		await startProc;
+    console.log(`UserApps.setStartupAppProcess(), p 4`);
 		const windowClosed = defer<false>();
 		this.startupApp.doWhenWindowCompletes(() => windowClosed.resolve(false));
 		const init = Promise.race([
 			coreInit.then(() => true),
 			windowClosed.promise
 		]);
+    console.log(`UserApps.setStartupAppProcess(), p 5, returns init process/promise`);
 		return { init };
 	}
 

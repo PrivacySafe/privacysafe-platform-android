@@ -148,8 +148,14 @@ export class InitProc {
       }
     }).catch(err => {
       this.userApps = undefined;
-      const errStr = `Login process fails:\n${err.message}\n${err.stack}`;
-      console.error(errStr);
+      let errStr = `Login process fails:\n`;
+      if (err.runtimeException) {
+        console.error(errStr, err);
+        errStr += JSON.stringify(err, null, 2);
+      } else {
+        errStr += `${err.message}\n${err.stack}`;
+        console.error(errStr);
+      }
       try {
         deferredComponent.reject(errStr);
       } catch (_err) {}

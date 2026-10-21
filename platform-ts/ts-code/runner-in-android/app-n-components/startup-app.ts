@@ -47,8 +47,12 @@ export class StartupAppInAndroid implements StartupApp {
     console.log(`StartupAppInAndroid.instantiate(), p 1`);
 		const { capsForStartup, coreInit } = startCore();
     const startProc = appManifestOnDev(STARTUP_APP_DOMAIN)
+    .catch(err => {
+      console.log('----- error in StartupAppInAndroid.instantiate ------\n', err);
+      throw err;
+    })
     .then(async manifest => {
-      console.log(`StartupAppInAndroid.instantiate(), p 2, manifest read`);
+      console.log(`StartupAppInAndroid.instantiate(), p 2, manifest read\n manifest is: \n${JSON.stringify(manifest)}`);
       const launchers = getLaunchersForUser(manifest, deviceFormFactor());
 			const entrypoint = launchers?.[0]?.component || MAIN_GUI_ENTRYPOINT;
       const { connectorId, setComponent } = provideW3NForActivity(capsForStartup as StartupW3N);
@@ -59,14 +63,6 @@ export class StartupAppInAndroid implements StartupApp {
         close: () => startupApp.close()
       });
       console.log(`StartupAppInAndroid.instantiate(), p 4, component was set`);
-    })
-    .catch(err => {
-      console.log('----- error in StartupAppInAndroid.instantiate ------');
-      console.log(err);
-      console.log('----- error in StartupAppInAndroid.instantiate ------');
-      console.log(JSON.stringify(err));
-      console.log('-----------');
-      throw err;
     });
     const startupApp = new StartupAppInAndroid();
     return { coreInit, startProc, startupApp };

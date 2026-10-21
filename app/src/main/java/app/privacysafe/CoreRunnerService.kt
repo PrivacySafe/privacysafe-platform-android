@@ -207,9 +207,13 @@ class CoreRunnerService : Service() {
 		}
 
 		suspend fun getConnectorToCore(appDomain: String, connectorId: String?, entrypoint: String?): UIComponent? {
+			Log.d("w3n", "CoreRunnerService.BinderFor3NWebApp.getConnectorToCore() for $appDomain, connector $connectorId, p 0")
 			return if (connectorId == null) {
+				Log.d("w3n", "CoreRunnerService.BinderFor3NWebApp.getConnectorToCore(), p 1, awaiting jsrunner.whenInitialized()")
 				jsrunner.whenInitialized()
+				Log.d("w3n", "CoreRunnerService.BinderFor3NWebApp.getConnectorToCore(), p 2, jsrunner is initialized")
 				val component = jsrunner.launchAppFromAndroid(appDomain)
+				Log.d("w3n", "CoreRunnerService.BinderFor3NWebApp.getConnectorToCore() for $appDomain, p 1")
 				if (component == null) {
 					null
 				} else {
@@ -220,7 +224,7 @@ class CoreRunnerService : Service() {
 			} else {
 				val connector = jsrunner.getAppGUIComponent(connectorId)
 				// connector can be null when connectorId value comes from some other logged in period via history
-				return UIComponent(connector ?: jsrunner.launchAppFromAndroid(appDomain)!!)
+				UIComponent(connector ?: jsrunner.launchAppFromAndroid(appDomain)!!)
 			}
 		}
 

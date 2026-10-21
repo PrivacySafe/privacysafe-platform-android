@@ -59,6 +59,14 @@ export class StartupAppInAndroid implements StartupApp {
         close: () => startupApp.close()
       });
       console.log(`StartupAppInAndroid.instantiate(), p 4, component was set`);
+    })
+    .catch(err => {
+      console.log('----- error in StartupAppInAndroid.instantiate ------');
+      console.log(err);
+      console.log('----- error in StartupAppInAndroid.instantiate ------');
+      console.log(JSON.stringify(err));
+      console.log('-----------');
+      throw err;
     });
     const startupApp = new StartupAppInAndroid();
     return { coreInit, startProc, startupApp };

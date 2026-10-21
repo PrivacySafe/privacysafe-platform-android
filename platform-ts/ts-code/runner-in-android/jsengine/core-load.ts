@@ -46,6 +46,8 @@ import { makeHybridCryptor } from "./hybrid-cryptor/from-android-and-in-proc-was
 // import { makeInProcessWasmCryptor } from "ecma-nacl-cryptors";
 // import { scanUrlQR } from "./caps/scan-qr";
 
+console.log(` ------ JS core loading, p 1 ------`);
+
 (function() {
 
   const { requestFromAndroid, openServiceEventsSource } = makeRequestFromAndroid();
@@ -147,3 +149,5 @@ import { makeHybridCryptor } from "./hybrid-cryptor/from-android-and-in-proc-was
   );
 
 })();
+
+console.log(` ------ JS core loading, p 2 ------`);

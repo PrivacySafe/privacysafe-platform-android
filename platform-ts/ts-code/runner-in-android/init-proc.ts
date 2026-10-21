@@ -212,6 +212,7 @@ export class InitProc {
 	}
 
   async launchAppFromAndroid(appDomain: string): Promise<{ connectorId: string; entrypoint: string; }> {
+    console.log(` ------ InitProc.launchAppFromAndroid(), for ${appDomain}, p 0`);
     if (appDomain == STARTUP_APP_DOMAIN) {
       if (!this.deferredLogin) {
         throw `Login has already been done in this single user setup`;

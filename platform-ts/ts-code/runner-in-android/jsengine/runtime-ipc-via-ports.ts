@@ -219,7 +219,7 @@ export type AndroidFnWrap = (args?: Buffer) => Promise<Buffer>;
 
 export function wrapFnOnAndroidSide(
 	portName: string,
-	deserializeErr?: (err: string) => unknown
+	deserializeErr = deserializeErrorFromString
 ): AndroidFnWrap {
 	const { newCall, completeCall } = makeDeferredCallsIntoAndroid(deserializeErr);
 
@@ -242,6 +242,14 @@ export function wrapFnOnAndroidSide(
 		(send ?? await init!)(msg);
 		return promise;
 	};
+}
+
+function deserializeErrorFromString(err: string): unknown {
+	try {
+		return JSON.parse(err);
+	} catch (exc) {
+		return new Error(`Error from Android side:\n${err}`);
+	}
 }
 
 export function utf8StringFromBytes(bytes: Uint8Array): string {

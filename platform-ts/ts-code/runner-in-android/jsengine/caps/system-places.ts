@@ -83,7 +83,7 @@ function readBytesFromAssets(
   fromPacks: boolean, path: string, start?: number, end?: number
 ): Promise<Uint8Array> {
   return readBytesFromAssetsFn(readFromAssetsPathArgsType.pack(
-    { fromPacks, path, start: start, end }
+    { fromPacks, path, start, end }
   ));
 }
 

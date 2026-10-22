@@ -60,9 +60,7 @@ class AssetsReadBytes (
 		val (
 			fromPacks, path, start, end
 		) = ProtoBuf.decodeFromByteArray<ReadFromAssetsPathArgs>(argsBytes)
-		Log.d("w3n", "AssetsReadBytes.call(), p 0, $fromPacks, $path, $start, $end")
 		val filePath = getPath(fromPacks, path)
-		Log.d("w3n", "AssetsReadBytes.call(), p 1, filePath $filePath")
 		return try {
 			assets.open(filePath).use { stream ->
 				if ((start != null) && (start > 0)) {
@@ -79,7 +77,6 @@ class AssetsReadBytes (
 				}
 			}
 		} catch (exc: IOException) {
-			Log.e("w3n", "AssetsReadBytes.call(), p err: \n${exc.stackTrace.joinToString("\n")}")
 			throw fsExc(exc)
 		}
 	}

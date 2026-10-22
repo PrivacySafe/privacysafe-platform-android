@@ -158,11 +158,8 @@ class JSRunner(
 	}
 
 	suspend fun launchAppFromAndroid(appDomain: String): AppGUIComponent? {
-		Log.d("w3n", "JSRunner.launchAppFromAndroid(), p 0")
 		whenInitialized()
-		Log.d("w3n", "JSRunner.launchAppFromAndroid(), p 1")
 		val (connectorId, entrypoint) = core.coreFns.launchAppFromAndroid(appDomain)
-		Log.d("w3n", "JSRunner.launchAppFromAndroid(), p 2")
 		return if (connectorId == "proceed-to-launcher") {
 			null
 		} else {

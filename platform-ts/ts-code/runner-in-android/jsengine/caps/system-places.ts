@@ -102,9 +102,7 @@ async function listFolderFromAssets(
 }
 
 export async function appManifestOnDev(appDomain: string): Promise<AppManifest> {
-  console.log(`appManifestOnDev() reading for ${appDomain}`);
   const bytes = await readBytesFromAssets(false, `${reverseDomain(appDomain)}/${MANIFEST_FILE}`);
-  console.log(`manifest file for ${appDomain} read`);
   return JSON.parse(utf8StringFromBytes(bytes));
 }
 

@@ -381,17 +381,12 @@ abstract class CallsIntoJS(
 	}
 
 	protected suspend inline fun <reified TArgs, reified TRes> callWithReturned(fnName: String, args: TArgs): TRes {
-		if (fnName == "launchAppFromAndroid") { Log.d("w3n", "callWithReturned(), js fn $fnName, p 0, with args $args") }
 		val (id, call) = makeDeferred()
-		if (fnName == "launchAppFromAndroid") { Log.d("w3n", "callWithReturned(), js fn $fnName, p 1") }
 		val req = ProtoBuf.encodeToByteArray(RequestWithinCallIntoJS(
 			id, fnName, ProtoBuf.encodeToByteArray(args)
 		))
-		if (fnName == "launchAppFromAndroid") { Log.d("w3n", "callWithReturned(), js fn $fnName, p 2") }
 		port.send(req)
-		if (fnName == "launchAppFromAndroid") { Log.d("w3n", "callWithReturned(), js fn $fnName, p 3") }
 		val rep = call.await()
-		if (fnName == "launchAppFromAndroid") { Log.d("w3n", "callWithReturned(), js fn $fnName, p 4") }
 		return ProtoBuf.decodeFromByteArray<TRes>(rep)
 	}
 

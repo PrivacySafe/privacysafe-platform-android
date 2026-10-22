@@ -100,13 +100,7 @@ function jsonToStats(json: StatsPB): Stats {
   };
 }
 
-function throwExcFromJSON(excJSON: string, path: string): never {
-  let exc: any;
-  try {
-    exc = JSON.parse(excJSON) as FileException;
-  } catch (err) {
-    throw errWithCause(excJSON, `error in operation on path ${path}`);
-  }
+function throwExcFromJSON(exc: any, path: string): never {
   if ((typeof exc !== 'object') || !exc) {
     throw new Error(`${exc}`);
   }

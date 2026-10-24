@@ -7,7 +7,7 @@
 
 	<Space
 		android:layout_width="match_parent"
-		android:layout_height="187dp" />
+		android:layout_height="180dp" />
 
 	<ImageView
 		android:id="@+id/imageView"
@@ -15,4 +15,24 @@
 		android:layout_height="128dp"
 		android:paddingHorizontal="10pt"
 		android:src="@drawable/privacysafe_logo" />
+
+	<Space
+		android:layout_width="match_parent"
+		android:layout_height="60dp" />
+
+	<TextView
+		android:id="@+id/progressTxt"
+		android:layout_width="match_parent"
+		android:layout_height="wrap_content"
+		android:paddingHorizontal="10pt"
+		android:text="@string/init_loading_platform" />
+
+	<ProgressBar
+		android:id="@+id/indeterminateBar"
+		android:layout_width="match_parent"
+		android:layout_height="wrap_content"
+		style="?android:attr/progressBarStyleHorizontal"
+		android:indeterminate="true"
+		android:paddingHorizontal="10pt" />
+
 </LinearLayout>

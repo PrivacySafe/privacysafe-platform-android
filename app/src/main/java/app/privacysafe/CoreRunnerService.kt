@@ -19,6 +19,7 @@ package app.privacysafe
 import android.app.Notification
 import android.app.NotificationChannel
 import android.app.NotificationManager
+import android.app.PendingIntent
 import android.app.Service
 import android.content.ComponentName
 import android.content.Context
@@ -26,14 +27,12 @@ import android.content.Intent
 import android.content.ServiceConnection
 import android.net.ConnectivityManager
 import android.net.Network
-import android.net.Uri
 import android.os.Binder
 import android.os.IBinder
 import android.util.Log
 import android.webkit.WebResourceResponse
 import android.webkit.WebView
 import androidx.core.app.NotificationCompat
-import androidx.javascriptengine.SandboxUnsupportedException
 import app.privacysafe.jsengine.AppGUIComponent
 import app.privacysafe.jsengine.JSRunner
 import app.privacysafe.jsengine.caps.CloseActivityOp
@@ -52,6 +51,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import java.io.FileNotFoundException
 import kotlin.system.exitProcess
+import androidx.core.net.toUri
 
 class CoreRunnerService : Service() {
 
@@ -65,68 +65,69 @@ class CoreRunnerService : Service() {
 
 	val connectivityIndicator = ConnectivityIndicator()
 
+	override fun onCreate() {
+		super.onCreate()
+		notifications = getSystemService(NOTIFICATION_SERVICE) as NotificationManager
+		connectivityIndicator.initialize(getSystemService(CONNECTIVITY_SERVICE) as ConnectivityManager)
+		startForeground(1, makeNewNotification())
+		initJSRunnerAndWirePostLogin()
+	}
+
 	override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
-		if (!this::notifications.isInitialized) {
-			notifications = getSystemService(NOTIFICATION_SERVICE) as NotificationManager
-			connectivityIndicator.initialize(getSystemService(CONNECTIVITY_SERVICE) as ConnectivityManager)
-		}
-		if (!this::jsrunner.isInitialized) {
-			startForeground(1, makeNewNotification())
-			deferredLogin = CompletableDeferred()
-			jsrunner = JSRunner(applicationContext, FnsForCoreInJS())
-			jsrunner.scope.launch {
-				try {
-					loggedUserId = jsrunner.whenUserSignedIn()
-					this@CoreRunnerService.deferredLogin?.complete(null)
-					this@CoreRunnerService.deferredLogin = null
-					notifications.notify(1, makeNewNotification())
-					val appToOpen = nonSystemAppToOpenWhenLoggedIn
-					nonSystemAppToOpenWhenLoggedIn = null
-					if (appToOpen != null) {
-						jsrunner.scope.launch {
-							delay(100)
-							start3NWebAppGUIComponent(applicationContext, appToOpen)
-						}
-					}
-				} catch (err: Throwable) {
-					this@CoreRunnerService.deferredLogin?.completeExceptionally(err)
-					notifications.cancel(1)
-				}
-			}
-		} else {
-			try {
-				if (loggedUserId == null) {
-					notifications.notify(1, makeNewNotification())
-				} else {
-					notifications.notify(1, makeNewNotification())
-				}
-			} catch (err: Throwable) {
-				Log.e("w3n", "Fail to set main notification item", err)
-			}
-		}
+		removeNotRunningAppTasks()
 		// service with core is a backbone of everything, hence it must run
 		return START_STICKY
 	}
 
+	private fun initJSRunnerAndWirePostLogin() {
+		deferredLogin = CompletableDeferred()
+		jsrunner = JSRunner(applicationContext, FnsForCoreInJS())
+		jsrunner.scope.launch {
+			try {
+				loggedUserId = jsrunner.whenUserSignedIn()
+				this@CoreRunnerService.deferredLogin?.complete(null)
+				this@CoreRunnerService.deferredLogin = null
+				notifications.notify(1, makeNewNotification())
+				val appToOpen = nonSystemAppToOpenWhenLoggedIn
+				nonSystemAppToOpenWhenLoggedIn = null
+				if (appToOpen != null) {
+					jsrunner.scope.launch {
+						delay(100)
+						this@CoreRunnerService.start3NWebAppGUIComponent(appToOpen)
+					}
+				}
+			} catch (err: Throwable) {
+				this@CoreRunnerService.deferredLogin?.completeExceptionally(err)
+				notifications.cancel(1)
+			}
+		}
+	}
+
 	private fun makeNewNotification(): Notification {
-		val notifBuild = NotificationCompat.Builder(this, CORE_RUNNER_NOTIFICATIONS_CHANNEL_ID)
+		return NotificationCompat.Builder(this, CORE_RUNNER_NOTIFICATIONS_CHANNEL_ID)
 			.setSmallIcon(R.drawable.app_logo)
 			.setContentTitle(resources.getString(R.string.app_name))
 			.setPriority(NotificationCompat.PRIORITY_LOW)
-			if (loggedUserId == null) {
-				notifBuild
-					.setContentText(resources.getString(R.string.tap_to_login_notification_txt))
-					.setContentIntent(intentToOpenStartUpFromNotification(applicationContext))
+			.setContentText(if (loggedUserId == null) {
+				getString(R.string.tap_to_login_notification_txt)
 			} else {
-				notifBuild
-					.setContentText(loggedUserId)
-					.setContentIntent(intentToOpenDashboardFromNotification(applicationContext))
+				loggedUserId
+			})
+			// can start launcher app only from app activity, so, startup talks to service that focuses/opens launcher
+			.setContentIntent(intentToOpenStartUpFromNotification())
+			.build()
+	}
+
+	private fun removeNotRunningAppTasks() {
+		getActivityManager().appTasks
+			.filter { t -> !t.taskInfo.isRunning }
+			.forEach { t ->
+				t.finishAndRemoveTask()
 			}
-		return notifBuild.build()
 	}
 
 	override fun onBind(intent: Intent): IBinder {
-		return when (intent.action) {
+		return when (customActionIn(intent)) {
 
 			// service for init is created when started activity binds
 			BIND_FOR_INIT_ACTION -> {
@@ -152,6 +153,12 @@ class CoreRunnerService : Service() {
 	override fun onDestroy() {
 		jsrunner.shutdown()
 		super.onDestroy()
+	}
+
+	fun openLauncher() {
+		if (!jsrunner.findAndFocusOpenAppInstance(Bundled.launcherDomain)) {
+			start3NWebAppGUIComponent(Bundled.launcherDomain)
+		}
 	}
 
 	/**
@@ -182,7 +189,7 @@ class CoreRunnerService : Service() {
 		}
 
 		fun openLauncher() {
-			start3NWebAppGUIComponentInPlatformTask(applicationContext, Bundled.launcherDomain)
+			this@CoreRunnerService.openLauncher()
 		}
 
 		fun startLogin(urlToProcess: String?) {
@@ -190,7 +197,7 @@ class CoreRunnerService : Service() {
 				jsrunner.processURLBeforeLogin(urlToProcess)
 			}
 			// this implicitly is a call to core to start login.
-			start3NWebAppStartupGUIComponentInPlatformTask(applicationContext, startupUrlHash)
+			startStartupApp(startupUrlHash)
 		}
 
 	}
@@ -225,13 +232,13 @@ class CoreRunnerService : Service() {
 		}
 
 		fun openLauncher() {
-			start3NWebAppGUIComponentInPlatformTask(applicationContext, Bundled.launcherDomain)
+			this@CoreRunnerService.openLauncher()
 		}
 
 		fun loginAndOpenApp(appDomain: String) {
 			assert((appDomain != Bundled.startupDomain) && (appDomain != Bundled.launcherDomain))
 			nonSystemAppToOpenWhenLoggedIn = appDomain
-			start3NWebAppGUIComponentInPlatformTask(applicationContext, Bundled.startupDomain)
+			start3NWebAppGUIComponent(Bundled.startupDomain)
 		}
 
 		fun findAnFocusOpenAppInstance(appDomain: String): Boolean {
@@ -246,11 +253,7 @@ class CoreRunnerService : Service() {
 
 		val startAndroidActivity: StartActivityOp = { connectorId, appDomain, entrypoint ->
 			jsrunner.makeAppGUIComponent(connectorId, appDomain, entrypoint)
-			if (appShouldStartInPlatformActivity(appDomain)) {
-				start3NWebAppGUIComponentInPlatformTask(applicationContext, connectorId, appDomain, entrypoint)
-			} else {
-				start3NWebAppGUIComponent(applicationContext, connectorId, appDomain, entrypoint)
-			}
+			start3NWebAppGUIComponent(connectorId, appDomain, entrypoint)
 		}
 
 		val closeActivity: CloseActivityOp = { connectorId ->
@@ -274,7 +277,7 @@ class CoreRunnerService : Service() {
 		}
 
 		val exitAll: ExitAllOp = {
-			this@CoreRunnerService.stopSelf()
+			stopSelf()
 			exitProcess(0)
 		}
 
@@ -287,7 +290,7 @@ class CoreRunnerService : Service() {
 		}
 
 		val openExternal: OpenExternalFn = { url ->
-			val browserIntent = Intent(Intent.ACTION_VIEW, Uri.parse(url))
+			val browserIntent = Intent(Intent.ACTION_VIEW, url.toUri())
 			browserIntent.addFlags((Intent.FLAG_ACTIVITY_NEW_TASK))
 			startActivity(browserIntent)
 		}
@@ -327,6 +330,7 @@ class CoreRunnerService : Service() {
 		}
 
 		fun setActive(isActive: Boolean) {
+			Log.d("w3n", "$appDomain set ${if (isActive) "active" else "idle"}")
 			component.setActive(isActive)
 		}
 
@@ -362,7 +366,7 @@ class CoreRunnerService : Service() {
 		private fun bundledAppResources(): GetAppResource {
 			val appDir = "${Bundled.Path.apps}/${appDomain.reverseDomain()}"
 			val lst = assets.list(appDir)
-			if ((lst == null) || lst.isEmpty()) {
+			if (lst.isNullOrEmpty()) {
 				throw Error("No bundled app $appDomain -- missing $appDir in assets")
 			}
 			val appResourcesDir = "$appDir/app"
@@ -397,21 +401,22 @@ typealias FnsForCoreInJS = CoreRunnerService.FnsForCoreInJS
 
 private const val INIT_CONNECTOR_ID = "init"
 
-private const val START_CORE_ACTION = "init-core-start"
+private const val START_CORE_BY_INIT_ACTION = "start-core-by-init"
+const val START_CORE_ON_BOOT_ACTION = "start-core-on-boot"
 
 /**
  * Main service runs all ipc flows, core and headless js processes. This should just run always.
  * Hence, it is started with startForegroundService(), and service must call its startForeground() to keep on
  * running.
  */
-fun startCoreRunnerService(ctx: Context) {
-	val intent = Intent(ctx, CoreRunnerService::class.java)
-		.setAction(START_CORE_ACTION)
-	ctx.startForegroundService(intent)
+fun Context.startCoreRunnerService(action: String) {
+	val intent = Intent(this, CoreRunnerService::class.java)
+		.setAction(customIntentAction(action))
+	this.startForegroundService(intent)
 }
 
-private fun <T : Binder> bindCoreService(
-	ctx: Context,
+
+private fun <T : Binder> Context.bindCoreService(
 	onDisconnect: ((name: ComponentName?) -> Unit)?,
 	setupIntent: (intent: Intent) -> Unit
 ): Pair<ServiceConnection, Deferred<T>> {
@@ -427,23 +432,21 @@ private fun <T : Binder> bindCoreService(
 			}
 		}
 	}
-	val intent = Intent(ctx, CoreRunnerService::class.java)
+	val intent = Intent(this, CoreRunnerService::class.java)
 	setupIntent(intent)
-	ctx.bindService(intent, srvConn, 0)
+	this.bindService(intent, srvConn, 0)
 	return Pair(srvConn, deferred)
 }
 
 private const val BIND_FOR_INIT_ACTION = "core-for-init"
 typealias CoreInit = CoreRunnerService.BinderForInit
 
-fun bindCoreServiceForInit(
-	ctx: Context, onDisconnect: ((name: ComponentName?) -> Unit)? = null
-): Pair<ServiceConnection, Deferred<CoreInit>> {
-	return bindCoreService(ctx, onDisconnect) { intent ->
-		intent.action = BIND_FOR_INIT_ACTION
+fun InitActivity.startAndBindCoreService(): Pair<ServiceConnection, Deferred<CoreInit>> {
+	startCoreRunnerService(START_CORE_BY_INIT_ACTION)
+	return bindCoreService({ finishAndRemoveTask() }) { intent ->
+		intent.action = customIntentAction(BIND_FOR_INIT_ACTION)
 	}
 }
-
 
 private const val BIND_FOR_3NWEB_APP_ACTION = "core-for-3nweb-app"
 const val APP_DOMAIN = "app-domain"
@@ -451,11 +454,9 @@ const val APP_DOMAIN = "app-domain"
 typealias BinderFor3NWebApp = CoreRunnerService.BinderFor3NWebApp
 typealias UIComponent = CoreRunnerService.UIComponent
 
-fun bindCoreServiceFor3NWebApp(
-	ctx: Context, appDomain: String, onDisconnect: ((name: ComponentName?)	-> Unit)
-): Pair<ServiceConnection, Deferred<BinderFor3NWebApp>> {
-	return bindCoreService(ctx, onDisconnect) { intent ->
-		intent.setAction(BIND_FOR_3NWEB_APP_ACTION)
+fun GenericAppActivity.bindCoreService(appDomain: String): Pair<ServiceConnection, Deferred<BinderFor3NWebApp>> {
+	return bindCoreService({ finishAndRemoveTask() }) { intent ->
+		intent.setAction(customIntentAction(BIND_FOR_3NWEB_APP_ACTION))
 			.putExtra(APP_DOMAIN, appDomain)
 	}
 }
@@ -474,10 +475,6 @@ fun addCoreRunnerNotificationChannelTo(ctx: Context, notifications: Notification
 	coreChannel.description = ctx.getString(R.string.core_runner_channel_description)
 	coreChannel.setShowBadge(false)
 	notifications.createNotificationChannel(coreChannel)
-}
-
-fun appShouldStartInPlatformActivity(appDomain: String): Boolean {
-	return (appDomain == Bundled.startupDomain) || (appDomain == Bundled.launcherDomain)
 }
 
 class ConnectivityIndicator(
@@ -507,51 +504,4 @@ class ConnectivityIndicator(
 	}
 
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 

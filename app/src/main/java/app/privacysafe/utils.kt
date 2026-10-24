@@ -20,6 +20,7 @@ import android.Manifest
 import android.app.ActivityManager
 import android.app.AlertDialog
 import android.content.Context
+import android.content.Intent
 import android.content.pm.PackageManager
 import android.webkit.PermissionRequest
 import androidx.activity.ComponentActivity
@@ -252,27 +253,21 @@ suspend fun showAlertDialogIn(activity: ComponentActivity, title: String, msg: S
 	deferred.await()
 }
 
-fun ActivityManager.findRunningTaskWithApp(appDomain: String): ActivityManager.AppTask? {
-	return this.appTasks.find { t ->
-		t.taskInfo.isRunning && (t.taskInfo.baseIntent.extras?.getString(APP_DOMAIN) ==	appDomain)
-	}
-}
-
-fun ActivityManager.findRunningTaskWithAppInstance(appDomain: String, connectorId: String): ActivityManager
-.AppTask? {
-	return this.appTasks.find { t ->
-		t.taskInfo.isRunning &&
-			(t.taskInfo.baseIntent.extras?.getString(APP_DOMAIN) ==	appDomain) &&
-			(t.taskInfo.baseIntent.extras?.getString(CONNECTOR_ID_OF_3NWEB_APP_INSTANCE) ==	connectorId)
-	}
-}
-
 fun Context.getActivityManager(): ActivityManager {
 	return getSystemService(Context.ACTIVITY_SERVICE) as ActivityManager
 }
 
 fun Context.customIntentAction(action: String): String {
-	return "${this.packageName}/$action"
+	return "$packageName/$action"
+}
+
+fun Context.customActionIn(intent: Intent): String? {
+	val action = intent.action
+	return if (action?.startsWith("$packageName/") == true) {
+		action.substring(packageName.length+1)
+	} else {
+		null
+	}
 }
 
 

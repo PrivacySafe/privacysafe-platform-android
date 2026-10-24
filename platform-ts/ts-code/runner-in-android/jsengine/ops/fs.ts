@@ -150,9 +150,9 @@ async function appendFile(
   await appendFileFn(appendFileArgsTypes.pack({ path, chunk: bytesOf(data, options) }))
   .catch(excStr => throwExcFromJSON(excStr, path));
   // XXX debug help in showing logged messages, that use this fs appendFile method
-  if ((typeof data === 'string') && path.includes(`/util/logs/`)) {
-    console.log(`Written to ${path}:`, data);
-  }
+  // if ((typeof data === 'string') && path.includes(`/util/logs/`)) {
+  //   console.log(`Written to ${path}:`, data);
+  // }
 }
 
 const readFileFn = wrapFnOnAndroidSide('fs_readFile');

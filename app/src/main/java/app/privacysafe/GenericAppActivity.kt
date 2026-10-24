@@ -18,13 +18,13 @@ package app.privacysafe
 
 import android.app.ComponentCaller
 import android.app.PendingIntent
-import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
 import android.content.ServiceConnection
 import android.os.Bundle
 import android.util.Log
 import android.webkit.WebView
+import android.widget.TextView
 import androidx.activity.ComponentActivity
 import androidx.activity.OnBackPressedCallback
 import kotlinx.coroutines.CoroutineScope
@@ -54,9 +54,12 @@ abstract class GenericAppActivity() : ComponentActivity() {
 		val connectorId = intent.extras?.getString(CONNECTOR_ID_OF_3NWEB_APP_INSTANCE)
 		val entrypoint = intent.extras?.getString(APP_COMPONENT_ENTRYPOINT)
 		val urlHash = intent.extras?.getString(APP_URL_HASH)
-		val (conn, coreDef) = bindCoreServiceFor3NWebApp(this, appDomain) { _: ComponentName? ->
-			finishAndRemoveTask()
+		if (appDomain == Bundled.startupDomain) {
+			setInitScreenText(getString(R.string.init_logging_in))
+		} else {
+			setInitScreenText("Loading $appDomain ...")
 		}
+		val (conn, coreDef) = bindCoreService(appDomain)
 		appSrvConn = conn
 		val permissionRequester = if (appDomain == Bundled.chatDomain) {
 			checkMultiplePermissionsAndRegisterRequesterIfNeeded(
@@ -99,7 +102,7 @@ abstract class GenericAppActivity() : ComponentActivity() {
 				val componentSrv = coreSrv.getConnectorToCore(appDomain, connectorId, entrypoint)
 				if (componentSrv == null) {
 					coreSrv.awaitLoginInProgress()
-					start3NWebAppGUIComponentInPlatformTask(applicationContext, Bundled.launcherDomain)
+					coreSrv.openLauncher()
 					finishAndRemoveTask()
 					return@launch
 				}
@@ -110,10 +113,9 @@ abstract class GenericAppActivity() : ComponentActivity() {
 				core.setUICallbacks(
 					close = { finishAndRemoveTask() },
 					focus = {
-						// TODO ths
 						start3NWebAppGUIComponent(
-							applicationContext, core.connectorId, core.appDomain, core.entrypoint,
-							newTask = false
+							core.connectorId, core.appDomain, core.entrypoint,
+							this@GenericAppActivity::class.java
 						)
 					}
 				)
@@ -135,10 +137,11 @@ abstract class GenericAppActivity() : ComponentActivity() {
 		}
 	}
 
+	private fun setInitScreenText(txt: String) {
+		findViewById<TextView?>(R.id.progressTxt)?.text = txt
+	}
+
 	override fun onNewIntent(intent: Intent, caller: ComponentCaller) {
-		if (this::core.isInitialized) {
-			Log.d("w3n", "new intent on ${core.appDomain}, connector ${core.connectorId}")
-		}
 		super.onNewIntent(intent, caller)
 	}
 
@@ -190,85 +193,52 @@ abstract class GenericAppActivity() : ComponentActivity() {
 
 var nextRequestCode = makeSequentialIntegerIdGenerator()
 
-fun intentToOpenStartUpFromNotification(ctx: Context): PendingIntent {
+fun CoreRunnerService.intentToOpenStartUpFromNotification(): PendingIntent {
 	return PendingIntent.getActivity(
-		ctx,
+		this,
 		nextRequestCode(),
-		intentToOpenAppInPlatformTask(ctx, null, Bundled.startupDomain, null),
-		PendingIntent.FLAG_MUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
+		intentToOpenApp(Bundled.startupDomain),
+		PendingIntent.FLAG_MUTABLE
 	)
 }
 
-fun intentToOpenDashboardFromNotification(ctx: Context): PendingIntent {
-	return PendingIntent.getActivity(
-		ctx,
-		nextRequestCode(),
-		intentToOpenAppInPlatformTask(ctx, null, Bundled.launcherDomain, null),
-		PendingIntent.FLAG_MUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
-	)
-}
-
-fun start3NWebAppGUIComponentInPlatformTask(
-	ctx: Context, connectorId: String, appDomain: String, entrypoint: String
-) {
-	ctx.startActivity(intentToOpenAppInPlatformTask(ctx, connectorId, appDomain, entrypoint))
-}
-
-fun start3NWebAppGUIComponentInPlatformTask(ctx: Context, appDomain: String) {
-	ctx.startActivity(intentToOpenAppInPlatformTask(ctx, null, appDomain, null))
-}
-
+private const val OPEN_APP_ACTION = "open-app"
 const val APP_COMPONENT_ENTRYPOINT = "app-component-entrypoint"
 const val CONNECTOR_ID_OF_3NWEB_APP_INSTANCE = "connector-id"
 private const val APP_URL_HASH = "app-url-hash"
 
-fun start3NWebAppStartupGUIComponentInPlatformTask(ctx: Context, startupUrlHash: String?) {
-	val intent = intentToOpenAppInPlatformTask(ctx, null, Bundled.startupDomain, null)
+fun CoreRunnerService.startStartupApp(startupUrlHash: String?) {
+	val intent = intentToOpenApp(Bundled.startupDomain)
 	if (startupUrlHash != null) {
 		intent.putExtra(APP_URL_HASH, startupUrlHash)
 	}
-	ctx.startActivity(intent)
+	this.startActivity(intent)
 }
 
-private fun intentToOpenAppInPlatformTask(
-	ctx: Context, connectorId: String?, appDomain: String, entrypoint: String?
-): Intent {
-	if ((connectorId != null) && (entrypoint == null)) {
-		throw IllegalArgumentException("App component entrypoint is missing when connector id is given")
-	}
-	val intent = Intent(ctx, classForApp(appDomain))
+private fun CoreRunnerService.intentToOpenApp(appDomain: String): Intent {
+	val intent = Intent(this, classForApp(appDomain))
 		.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
 		.addFlags(Intent.FLAG_ACTIVITY_MULTIPLE_TASK)
-//		.addFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP)
 		.setAction(Intent.ACTION_MAIN)
 		.putExtra(APP_DOMAIN, appDomain)
-	if (connectorId != null) {
-		intent
-			.putExtra(CONNECTOR_ID_OF_3NWEB_APP_INSTANCE, connectorId)
-			.putExtra(APP_COMPONENT_ENTRYPOINT, entrypoint)
-	}
 	return intent
 }
 
-fun start3NWebAppGUIComponent(ctx: Context, appDomain: String) {
-	val intent = Intent(ctx, classForApp(appDomain))
-		.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-		.addFlags(Intent.FLAG_ACTIVITY_MULTIPLE_TASK)
-		.setAction(Intent.ACTION_MAIN)
-		.putExtra(APP_DOMAIN, appDomain)
-	ctx.startActivity(intent)
+fun CoreRunnerService.start3NWebAppGUIComponent(appDomain: String) {
+	this.startActivity(intentToOpenApp(appDomain))
 }
 
-fun start3NWebAppGUIComponent(
-	ctx: Context, connectorId: String, appDomain: String, entrypoint: String, newTask: Boolean = true
+fun Context.start3NWebAppGUIComponent(
+	connectorId: String, appDomain: String, entrypoint: String,
+	classOfExistingTask: Class<out GenericAppActivity>? =null
 ) {
 	// TODO add permissions data
-	val intent = Intent(ctx, classForApp(appDomain))
+	val intent = Intent(this, classOfExistingTask ?: classForApp(appDomain))
 		.putExtra(CONNECTOR_ID_OF_3NWEB_APP_INSTANCE, connectorId)
 		.putExtra(APP_DOMAIN, appDomain)
 		.putExtra(APP_COMPONENT_ENTRYPOINT, entrypoint)
 		.setAction(Intent.ACTION_MAIN)
-	if (newTask) {
+	if (classOfExistingTask == null) {
 		intent
 			.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
 			.addFlags(Intent.FLAG_ACTIVITY_MULTIPLE_TASK)
@@ -277,7 +247,7 @@ fun start3NWebAppGUIComponent(
 			.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
 			.addFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP)
 	}
-	ctx.startActivity(intent)
+	this.startActivity(intent)
 }
 
 private fun classForApp(appDomain: String): Class<out GenericAppActivity> {

@@ -51,19 +51,9 @@
 			android:exported="true">
 			<intent-filter>
 				<action android:name="android.intent.action.BOOT_COMPLETED" />
-			</intent-filter>
-		</receiver>
-
-		<!-- TODO add class ReloadOnUpdate to do graceful exit of core and start of new everything
-		<receiver
-			android:name=".ReloadOnUpdate"
-			android:enabled="true"
-			android:exported="true">
-			<intent-filter>
 				<action android:name="android.intent.action.MY_PACKAGE_REPLACED" />
 			</intent-filter>
 		</receiver>
-		-->
 
 		<service
 			android:name=".CoreRunnerService"
@@ -74,6 +64,7 @@
 		<activity
 			android:name=".InitActivity"
 			android:exported="true"
+			android:launchMode="singleTask"
 			android:configChanges="touchscreen|keyboard|keyboardHidden|orientation|screenLayout|screenSize"
 			android:resizeableActivity="true"
 			android:supportsPictureInPicture="true"
@@ -81,9 +72,6 @@
 			<intent-filter>
 				<action android:name="android.intent.action.MAIN" />
 				<category android:name="android.intent.category.LAUNCHER" />
-			</intent-filter>
-			<intent-filter>
-				<action android:name="android.intent.action.BOOT_COMPLETED" />
 			</intent-filter>
 			<intent-filter>
 				<action android:name="android.intent.action.VIEW" />

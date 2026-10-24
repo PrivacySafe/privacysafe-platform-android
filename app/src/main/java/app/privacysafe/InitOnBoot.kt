@@ -14,7 +14,7 @@ class InitOnBoot : BroadcastReceiver() {
 		}
 		val mngr: NotificationManager = ctx!!.getSystemService(NOTIFICATION_SERVICE) as NotificationManager
 		addCoreRunnerNotificationChannelTo(ctx, mngr)
-		startCoreRunnerService(ctx)
+		ctx.startCoreRunnerService(START_CORE_ON_BOOT_ACTION)
 	}
 
 }

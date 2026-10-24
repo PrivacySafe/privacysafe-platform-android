@@ -20,13 +20,11 @@ import android.app.NotificationManager
 import android.content.Intent
 import android.content.ServiceConnection
 import android.os.Bundle
-import android.util.Log
 import androidx.activity.ComponentActivity
 import androidx.javascriptengine.SandboxUnsupportedException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
-import kotlin.system.exitProcess
 
 class InitActivity : ComponentActivity() {
 
@@ -48,12 +46,11 @@ class InitActivity : ComponentActivity() {
 			if (!havePermissions) {
 				showAlertDialogIn(
 					this@InitActivity,
-					resources.getString(R.string.notification_perm_dialog_title),
-					resources.getString(R.string.notification_perm_dialog_message)
+					getString(R.string.notification_perm_dialog_title),
+					getString(R.string.notification_perm_dialog_message)
 				)
 			}
 			addCoreRunnerNotificationChannelTo(applicationContext, notifications)
-			startCoreRunnerService(applicationContext)
 			startCoreServiceAndForwardToSystemApp()
 		}
 	}
@@ -62,22 +59,8 @@ class InitActivity : ComponentActivity() {
 		super.onNewIntent(intent)
 	}
 
-	override fun onResume() {
-		super.onResume()
-	}
-
-	override fun onTrimMemory(level: Int) {
-		super.onTrimMemory(level)
-	}
-
-	override fun onLowMemory() {
-	}
-
 	private fun startCoreServiceAndForwardToSystemApp() {
-
-		val (conn, coreDef) = bindCoreServiceForInit(this) {
-			finishAndRemoveTask()
-		}
+		val (conn, coreDef) = this.startAndBindCoreService()
 		coreSrvConn = conn
 		scope.launch {
 			core = coreDef.await()
@@ -105,13 +88,13 @@ class InitActivity : ComponentActivity() {
 			return
 		} catch (_: SandboxUnsupportedException) {
 			showAlertDialogIn(
-				this@InitActivity,
+				this,
 				resources.getString(R.string.missing_sandbox_dialog_title),
 				resources.getString(R.string.missing_sandbox_dialog_message)
 			)
 		} catch (err: Throwable) {
 			showAlertDialogIn(
-				this@InitActivity,
+				this,
 				resources.getString(R.string.start_err_dialog_title),
 				"${resources.getString(R.string.start_err_dialog_message)}\n${err.stackTraceToString()}"
 			)

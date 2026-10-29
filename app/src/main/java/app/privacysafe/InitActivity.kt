@@ -50,7 +50,6 @@ class InitActivity : ComponentActivity() {
 					getString(R.string.notification_perm_dialog_message)
 				)
 			}
-			addCoreRunnerNotificationChannelTo(applicationContext, notifications)
 			startCoreServiceAndForwardToSystemApp()
 		}
 	}

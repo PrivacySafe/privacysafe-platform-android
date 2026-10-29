@@ -9,11 +9,9 @@ import android.content.Intent
 class InitOnBoot : BroadcastReceiver() {
 
 	override fun onReceive(ctx: Context?, intent: Intent?) {
-		if (intent?.action == null) {
+		if ((intent?.action == null) || (ctx == null)) {
 			return
 		}
-		val mngr: NotificationManager = ctx!!.getSystemService(NOTIFICATION_SERVICE) as NotificationManager
-		addCoreRunnerNotificationChannelTo(ctx, mngr)
 		ctx.startCoreRunnerService(START_CORE_ON_BOOT_ACTION)
 	}
 

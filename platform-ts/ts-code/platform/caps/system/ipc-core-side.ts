@@ -28,6 +28,7 @@ type SystemMonitor = web3n.system.monitor.SystemMonitor;
 type UserLoginSettings = web3n.system.UserLoginSettings;
 type AutoStartupSettings = web3n.system.AutoStartupSettings;
 type OtherOpenUsers = web3n.system.OtherOpenUsers;
+type Networks = web3n.system.networks.Networks;
 
 export function exposeSystemCAP(
 	cap: SysUtils, expServices: CoreSideServices
@@ -59,6 +60,9 @@ export function exposeSystemCAP(
 	}
 	if (cap.otherOpenUsers) {
 		wrap.otherOpenUsers = exposeOtherUsersCAP(cap.otherOpenUsers);
+	}
+	if (cap.networks) {
+		wrap.networks = exposeNetworksCAP(cap.networks);
 	}
 	return wrap;
 }
@@ -212,6 +216,32 @@ function exposeOtherUsersCAP(cap: OtherOpenUsers): ExposedObj<OtherOpenUsers> {
 		list: jsonSrv.wrapReqReplySrvMethod(cap, 'list'),
 		openDashboardOf: jsonSrv.wrapReqReplySrvMethod(cap, 'openDashboardOf')
 	};
+}
+
+function exposeNetworksCAP(cap: Networks): ExposedObj<Networks> {
+	const wrap: ExposedObj<Networks> = {
+		dnsAndIP: exposeDnsAndIpNetworkCAP(cap.dnsAndIP)
+	};
+	if (cap.onion) {
+		wrap.onion = exposeOnionNetworkCAP(cap.onion);
+	}
+	return wrap;
+}
+
+function exposeDnsAndIpNetworkCAP(cap: Networks['dnsAndIP']): ExposedObj<Networks['dnsAndIP']> {
+	return {
+		testProxySetup: jsonSrv.wrapReqReplySrvMethod(cap, 'testProxySetup'),
+		currentProxy: jsonSrv.wrapReqReplySrvMethod(cap, 'currentProxy'),
+		setCurrentProxy: jsonSrv.wrapReqReplySrvMethod(cap, 'setCurrentProxy')
+	}
+}
+
+function exposeOnionNetworkCAP(cap: NonNullable<Networks['onion']>): ExposedObj<NonNullable<Networks['onion']>> {
+	return {
+		testConnection: jsonSrv.wrapReqReplySrvMethod(cap, 'testConnection'),
+		setTorProxy: jsonSrv.wrapReqReplySrvMethod(cap, 'setTorProxy'),
+		currentSetup: jsonSrv.wrapReqReplySrvMethod(cap, 'currentSetup')
+	}
 }
 
 

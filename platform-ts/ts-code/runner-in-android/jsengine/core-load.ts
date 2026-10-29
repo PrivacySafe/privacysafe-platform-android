@@ -25,10 +25,9 @@ import { InitProc } from "../init-proc";
 import { makeCoreDriver } from "../../platform/core";
 import { makeSystemPlaces } from "./caps/system-places";
 import { AppDownloader } from "../../platform/caps/system/apps-downloader";
-import { wrapNetworkFns } from "core-3nweb-client-lib/build/lib-client/networks";
-import { appDirs, dohAt } from "core-3nweb-client-lib";
-import { deviceFormFactor, dohURLs, LAUNCHER_APP_DOMAIN, loggerToFileAndConsole, makeUICap, SIGNUP_URL, sysFilesOnDevice } from "./confs";
-import { makeRequestFromAndroid } from "./ops/request";
+import { appDirs } from "core-3nweb-client-lib";
+import { deviceFormFactor, LAUNCHER_APP_DOMAIN, loggerToFileAndConsole, makeUICap, SIGNUP_URL, sysFilesOnDevice } from "./confs";
+import { makeNetworksParts } from "./networks";
 import { makeRandom } from "./ops/random";
 import { showSystemErrorBox } from "./ops/android-activities";
 import { makeConnectivity } from "./caps/connectivity";
@@ -43,31 +42,21 @@ import { PlatformResources } from "../../platform/inject-defs/platform";
 import { Logging } from "../../platform/inject-defs/confs";
 import { hashing } from 'ecma-nacl';
 import { makeHybridCryptor } from "./hybrid-cryptor/from-android-and-in-proc-wasm";
+import { makeOpenURLCAP } from "./caps/openers";
+import { notificationsMaker } from "./caps/user-notifications";
 // import { makeInProcessWasmCryptor } from "ecma-nacl-cryptors";
 // import { scanUrlQR } from "./caps/scan-qr";
 
 
 (function() {
 
-  const { requestFromAndroid, openServiceEventsSource } = makeRequestFromAndroid();
-
-  const dnsResolvers = [
-    ...dohURLs.map(({ url, type }) => dohAt(requestFromAndroid, url, type))
-  ];
-
-  const { makeNet: makeNetClient, makeLocator: makeServiceLocator } = wrapNetworkFns({
-    regular: {
-      requests: requestFromAndroid,
-      openServiceEventsSource,
-      naming: dnsResolvers
-    }
-  });
-
   async function sha512(bytes: Buffer): Promise<string> {
     return (hashing.sha512.hash(bytes) as any).toBase64();
   }
 
   function makePlatformResources(utilDir: string, logging: Logging): PlatformResources {
+
+    const { makeNetClient, makeServiceLocator, networks } = makeNetworksParts();
 
     function clearLogsDirAndScheduleNextCleanup() {
       logging.removeOlderLogs();
@@ -81,24 +70,23 @@ import { makeHybridCryptor } from "./hybrid-cryptor/from-android-and-in-proc-was
           sysPlaces, makeServiceLocator('w3nApp', logging.logError), makeNetClient(), sha512
         ),
         makeAutoStartupCAP,
-        makeConnectivity,
-        makeMediaDevicesCAP: undefined,
         makeSystemPlaces: storages => makeSystemPlaces(storages, logging.logError),
         makeUICap,
+        makeMediaDevicesCAP: undefined,
+        makeConnectivity,
         shell: {
           makeClipboardCAP: undefined,
-          makeMountsCAP: undefined,
-          makeNotifications: undefined,
           makeOpenFileCAP: undefined,
           makeOpenFolderCAP: undefined,
-          makeOpenURLCAP: undefined,
+          makeOpenURLCAP,
           openInMountedFolderCAP: undefined,
+          makeMountsCAP: undefined,
+          makeNotifications: notificationsMaker(logging.logError),
           // scanUrlQR
         }
       },
       LAUNCHER_APP_DOMAIN,
       logging,
-      // makeCryptor: makeInProcessWasmCryptor,
       makeCryptor: makeHybridCryptor,
       random: makeRandom(),
       makeNetClient,

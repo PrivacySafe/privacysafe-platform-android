@@ -81,7 +81,7 @@ fun mimeFromFileExt(path: String): String? {
 	if (indOfDot < 0) {
 		return null
 	}
-	val ext = path.slice(indOfDot..(path.length-1))
+	val ext = path.slice(indOfDot..<path.length)
 	return extToMime[ext]
 }
 
@@ -212,12 +212,12 @@ fun checkPermissionAndRegisterRequesterIfNeeded(
 	}
 }
 
-fun checkMultiplePermissionsAndRegisterRequesterIfNeeded(
-	activity: ComponentActivity, vararg permissions: String
+fun GenericAppActivity.checkMultiplePermissionsAndRegisterRequesterIfNeeded(
+	vararg permissions: String
 ): (suspend () -> Map<String, Boolean>)? {
 	val missingPermissions = mutableListOf<String>()
 	for (permission in permissions) {
-		if (activity.checkSelfPermission(permission) != PackageManager.PERMISSION_GRANTED) {
+		if (checkSelfPermission(permission) != PackageManager.PERMISSION_GRANTED) {
 			missingPermissions.add(permission)
 		}
 	}
@@ -225,7 +225,7 @@ fun checkMultiplePermissionsAndRegisterRequesterIfNeeded(
 		return null
 	}
 	val deferred = CompletableDeferred<Map<String, Boolean>>()
-	val requester = activity.registerForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) {
+	val requester = registerForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) {
 			grants -> deferred.complete(grants)
 	}
 	return suspend {

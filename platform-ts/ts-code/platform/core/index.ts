@@ -149,9 +149,15 @@ export class CoreDriver {
 		}
 	}
 
+	// XXX we should set core ready before coreAppsInit settles, our it should give 
+
 	private async doAfterInit(userId: string, coreAppsInit?: Promise<void>): Promise<void> {
 		this.signedUser = userId;
 		this.userNotifications?.setUserId(this.signedUser);
+
+		// XXX change this wait to something else for test stand, as it needs await
+		// may be runner in stand should be aware of events, tec.
+
 		await coreAppsInit;
 		if (this.coreReady) {
 			this.coreReady.resolve();

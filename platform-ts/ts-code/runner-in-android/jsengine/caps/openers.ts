@@ -15,6 +15,7 @@
  this program. If not, see <http://www.gnu.org/licenses/>.
 */
 
+import { OpenURLWhitelistEntry, urlFitsFilter } from "../../../platform/libs-common-for-impls/url-filtering";
 import { stringValueType, wrapFnOnAndroidSide } from "../runtime-ipc-via-ports";
 
 
@@ -23,3 +24,24 @@ const openExtFn = wrapFnOnAndroidSide('open_external');
 export async function openExternalUrl(url: string): Promise<void> {
 	await openExtFn(stringValueType.pack({ value: url }));
 }
+
+export function makeOpenURLCAP(capsReq: web3n.caps.ShellCAPsSetting['openURL']): {
+	cap: NonNullable<web3n.shell.ShellCAPs['openURL']>;
+}|undefined {
+	if (Array.isArray(capsReq) && (capsReq.length > 0)) {
+		return { cap: url => openURL(capsReq, url) };
+	} else {
+		return;
+	}
+}
+
+async function openURL(whitelist: OpenURLWhitelistEntry[], url: string): Promise<void> {
+	const urlObj = new URL(url);
+	for (const entry of whitelist) {
+		if (urlFitsFilter(entry, urlObj)) {
+			await openExternalUrl(url);
+			return;
+		}
+	}
+}
+

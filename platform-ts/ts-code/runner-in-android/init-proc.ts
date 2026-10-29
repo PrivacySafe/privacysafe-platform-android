@@ -33,7 +33,7 @@ import { lookForAutologinUsers, saveUserKeyForAutologin } from "./jsengine/caps/
 import { Logging } from "../platform/inject-defs/confs";
 import { mkdir } from "../platform/lib-common/async-fs-node";
 import { toCanonicalAddress } from "../platform/lib-common/canonical-address";
-import { openExternalUrl } from "./jsengine/caps/open-external";
+import { openExternalUrl } from "./jsengine/caps/openers";
 import { DevApps } from "../platform/inject-defs/test-stand";
 import { parse3NWebURL, SysCmd } from "./custom-url-schemas";
 import { CONTACTS_APP_DOMAIN } from "./bundle-confs";

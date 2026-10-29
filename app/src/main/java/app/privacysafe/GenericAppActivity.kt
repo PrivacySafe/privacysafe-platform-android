@@ -18,7 +18,6 @@ package app.privacysafe
 
 import android.app.ComponentCaller
 import android.app.PendingIntent
-import android.content.Context
 import android.content.Intent
 import android.content.ServiceConnection
 import android.os.Bundle
@@ -44,16 +43,14 @@ abstract class GenericAppActivity() : ComponentActivity() {
 
 	protected val scope = CoroutineScope(Dispatchers.Main)
 
+	protected lateinit var appDomain: String
 	protected lateinit var core: UIComponent
 	protected lateinit var appSrvConn: ServiceConnection
 
 	override fun onCreate(savedInstanceState: Bundle?) {
 		super.onCreate(savedInstanceState)
 		setContentView(R.layout.init_layout)
-		val appDomain = intent.extras!!.getString(APP_DOMAIN)!!
-		val connectorId = intent.extras?.getString(CONNECTOR_ID_OF_3NWEB_APP_INSTANCE)
-		val entrypoint = intent.extras?.getString(APP_COMPONENT_ENTRYPOINT)
-		val urlHash = intent.extras?.getString(APP_URL_HASH)
+		appDomain = intent.extras!!.getString(APP_DOMAIN)!!
 		if (appDomain == Bundled.startupDomain) {
 			setInitScreenText(getString(R.string.init_logging_in))
 		} else {
@@ -61,72 +58,14 @@ abstract class GenericAppActivity() : ComponentActivity() {
 		}
 		val (conn, coreDef) = bindCoreService(appDomain)
 		appSrvConn = conn
-		val permissionRequester = if (appDomain == Bundled.chatDomain) {
-			checkMultiplePermissionsAndRegisterRequesterIfNeeded(
-				this, Permission.RECORD_AUDIO, Permission.CAMERA,
-			)
-		} else { null }
-
-		// TODO
-		//  - info about required permissions should be available here
-		//  - should manifest, or parameters from it be in intent's extra's?
-
-
 		scope.launch {
-
-			if (permissionRequester != null) {
-				permissionRequester()
-			}
-
-			val coreSrv = coreDef.await()
-
-			if (coreSrv.isUserLoggedIn) {
-				if (appDomain == Bundled.startupDomain) {
-					coreSrv.openLauncher()
-					finishAndRemoveTask()
-					return@launch
-				}
-				if (connectorId == null) {
-					if (coreSrv.findAnFocusOpenAppInstance(appDomain)) {
-						finishAndRemoveTask()
-						return@launch
-					}
-				}
-			} else if ((appDomain != Bundled.startupDomain) && (appDomain != Bundled.launcherDomain)) {
-				coreSrv.loginAndOpenApp(appDomain)
-				finishAndRemoveTask()
-				return@launch
-			}
-
 			try {
-				val componentSrv = coreSrv.getConnectorToCore(appDomain, connectorId, entrypoint)
-				if (componentSrv == null) {
-					coreSrv.awaitLoginInProgress()
-					coreSrv.openLauncher()
+				val coreSrv = coreDef.await()
+				if (setup(coreSrv)) {
+					core.setActive(true)
+				} else {
 					finishAndRemoveTask()
-					return@launch
 				}
-				core = componentSrv
-
-				// TODO service method to get dynamically app info from its manifest, name, icon, etc.
-
-				core.setUICallbacks(
-					close = { finishAndRemoveTask() },
-					focus = {
-						start3NWebAppGUIComponent(
-							core.connectorId, core.appDomain, core.entrypoint,
-							this@GenericAppActivity::class.java
-						)
-					}
-				)
-				setContentView(R.layout.w3n_app_layout)
-				val gui = findViewById<WebView>(R.id.app_gui)
-				bindToAndroidBackButtonTo(gui)
-				setupTouchEventsListenerTo(gui)
-				gui.settings.mediaPlaybackRequiresUserGesture = false
-				val load = core.attachGUI(gui, urlHash)
-				load()
-				core.setActive(true)
 			} catch (err: Throwable) {
 				Log.e(
 					"w3n",
@@ -137,12 +76,92 @@ abstract class GenericAppActivity() : ComponentActivity() {
 		}
 	}
 
+	protected open suspend fun setup(coreSrv: BinderFor3NWebApp): Boolean {
+
+		if (!coreSrv.isUserLoggedIn) {
+			coreSrv.loginAndOpenApp(appDomain)
+			return false
+		}
+
+		// TODO
+		//  - info about required permissions should be available here
+		//  - should manifest, or parameters from it be in intent's extra's?
+
+		val permissionRequester = if (appDomain == Bundled.chatDomain) {
+			checkMultiplePermissionsAndRegisterRequesterIfNeeded(
+				Permission.RECORD_AUDIO, Permission.CAMERA,
+			)
+		} else { null }
+
+		if (permissionRequester != null) {
+			permissionRequester()
+		}
+
+		return if (intent.action == Intent.ACTION_MAIN) {
+			// XXX does this ever happen ?
+			focusOpenedOrSetupThis(coreSrv)
+		} else when (customActionIn(intent)) {
+			START_APP_ACTION -> setupAndLoadWithConnectorFromIntent(coreSrv)
+			else -> false
+		}
+
+	}
+
+	protected suspend fun focusOpenedOrSetupThis(coreSrv: BinderFor3NWebApp): Boolean {
+		return !coreSrv.findAndFocusOpenAppInstance(appDomain, null) &&
+			setCore(coreSrv, null, null) &&
+			setupGuiComponentAndLoad(null)
+	}
+
+	protected suspend fun setupAndLoadWithConnectorFromIntent(coreSrv: BinderFor3NWebApp): Boolean {
+		val connectorId = intent.extras?.getString(CONNECTOR_ID_OF_3NWEB_APP_INSTANCE)
+		val entrypoint = intent.extras?.getString(APP_COMPONENT_ENTRYPOINT)
+		return setCore(coreSrv, connectorId, entrypoint) && setupGuiComponentAndLoad(null)
+	}
+
+	protected suspend fun setCore(
+		coreSrv: BinderFor3NWebApp, connectorId: String?, entrypoint: String?
+	): Boolean {
+		val componentSrv = coreSrv.getConnectorToCore(appDomain, connectorId, entrypoint)
+		if (componentSrv == null) {
+			coreSrv.awaitLoginInProgress()
+			coreSrv.openLauncher()
+			return false
+		} else {
+			core = componentSrv
+			return true
+		}
+	}
+
+	protected suspend fun setupGuiComponentAndLoad(urlHash: String?): Boolean {
+
+		// TODO service method to get dynamically app info from its manifest, name, icon, etc.
+
+		core.setUICallbacks(
+			close = { finishAndRemoveTask() },
+			focus = {
+				focus3NWebAppGUIComponent(
+					core.connectorId, core.appDomain, core.entrypoint,
+					this@GenericAppActivity::class.java
+				)
+			}
+		)
+		setContentView(R.layout.w3n_app_layout)
+		val gui = findViewById<WebView>(R.id.app_gui)
+		bindToAndroidBackButtonTo(gui)
+		setupTouchEventsListenerTo(gui)
+		gui.settings.mediaPlaybackRequiresUserGesture = false
+		val load = core.attachGUI(gui, urlHash)
+		load()
+
+		return true
+	}
+
 	private fun setInitScreenText(txt: String) {
 		findViewById<TextView?>(R.id.progressTxt)?.text = txt
 	}
 
 	override fun onNewIntent(intent: Intent, caller: ComponentCaller) {
-		super.onNewIntent(intent, caller)
 	}
 
 	override fun onResume() {
@@ -191,6 +210,69 @@ abstract class GenericAppActivity() : ComponentActivity() {
 
 }
 
+class StartupAppActivity () : GenericAppActivity() {
+	override suspend fun setup(coreSrv: BinderFor3NWebApp): Boolean {
+		return if (coreSrv.isUserLoggedIn) {
+			coreSrv.openLauncher()
+			false
+		} else {
+			if (setCore(coreSrv, null, null)) {
+				val urlHash = intent.extras?.getString(APP_URL_HASH)
+				setupGuiComponentAndLoad(urlHash)
+			} else {
+				false
+			}
+		}
+	}
+	override fun onNewIntent(intent: Intent, caller: ComponentCaller) {}
+}
+
+class DashboardAppActivity () : GenericAppActivity() {
+	override suspend fun setup(coreSrv: BinderFor3NWebApp): Boolean {
+
+		if (!coreSrv.isUserLoggedIn) {
+			coreSrv.loginAndOpenApp(appDomain)
+			return false
+		}
+
+		return if (intent.action == Intent.ACTION_MAIN) {
+			focusOpenedOrSetupThis(coreSrv)
+		} else when (customActionIn(intent)) {
+
+			OPEN_APP_NOTIFICATION_ACTION -> {
+				val notificationId = intent.extras?.getInt(NOTIFICATION_ID)
+				if((notificationId == null) || (notificationId == 0)) {
+					return false
+				}
+				if (coreSrv.findAndFocusOpenAppInstance(appDomain, notificationId)) { return false }
+				if (setCore(coreSrv, null, null) && setupGuiComponentAndLoad(null)) {
+					coreSrv.notificationClicked(notificationId)
+					true
+				} else {
+					false
+				}
+			}
+
+			START_APP_ACTION -> {
+				setupAndLoadWithConnectorFromIntent(coreSrv)
+			}
+
+			else -> {
+				false
+			}
+		}
+	}
+
+	override fun onNewIntent(intent: Intent, caller: ComponentCaller) {
+		when (customActionIn(intent)) {
+			OPEN_APP_NOTIFICATION_ACTION -> {
+				val notificationId = intent.extras?.getInt(NOTIFICATION_ID) ?: return
+				core.notificationClicked(notificationId)
+			}
+		}
+	}
+}
+
 var nextRequestCode = makeSequentialIntegerIdGenerator()
 
 fun CoreRunnerService.intentToOpenStartUpFromNotification(): PendingIntent {
@@ -202,17 +284,35 @@ fun CoreRunnerService.intentToOpenStartUpFromNotification(): PendingIntent {
 	)
 }
 
-private const val OPEN_APP_ACTION = "open-app"
+fun CoreRunnerService.intentForAppNotification(notificationId: Int): PendingIntent {
+	val intent = Intent(this, DashboardAppActivity::class.java)
+		.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+		.addFlags(Intent.FLAG_ACTIVITY_MULTIPLE_TASK)
+		.setAction(customIntentAction(OPEN_APP_NOTIFICATION_ACTION))
+		.putExtra(APP_DOMAIN, Bundled.launcherDomain)
+		.putExtra(NOTIFICATION_ID, notificationId)
+	return PendingIntent.getActivity(
+		this,
+		nextRequestCode(),
+		intent,
+		PendingIntent.FLAG_IMMUTABLE
+	)
+}
+
+private const val START_APP_ACTION = "start-app"
+private const val FOCUS_APP_ACTION = "focus-app"
+private const val OPEN_APP_NOTIFICATION_ACTION = "open-app-notification"
 const val APP_COMPONENT_ENTRYPOINT = "app-component-entrypoint"
 const val CONNECTOR_ID_OF_3NWEB_APP_INSTANCE = "connector-id"
 private const val APP_URL_HASH = "app-url-hash"
+private const val NOTIFICATION_ID = "notification-id"
 
 fun CoreRunnerService.startStartupApp(startupUrlHash: String?) {
 	val intent = intentToOpenApp(Bundled.startupDomain)
 	if (startupUrlHash != null) {
 		intent.putExtra(APP_URL_HASH, startupUrlHash)
 	}
-	this.startActivity(intent)
+	startActivity(intent)
 }
 
 private fun CoreRunnerService.intentToOpenApp(appDomain: String): Intent {
@@ -225,29 +325,34 @@ private fun CoreRunnerService.intentToOpenApp(appDomain: String): Intent {
 }
 
 fun CoreRunnerService.start3NWebAppGUIComponent(appDomain: String) {
-	this.startActivity(intentToOpenApp(appDomain))
+	startActivity(intentToOpenApp(appDomain))
 }
 
-fun Context.start3NWebAppGUIComponent(
-	connectorId: String, appDomain: String, entrypoint: String,
-	classOfExistingTask: Class<out GenericAppActivity>? =null
+fun CoreRunnerService.start3NWebAppGUIComponent(
+	connectorId: String, appDomain: String, entrypoint: String
 ) {
-	// TODO add permissions data
-	val intent = Intent(this, classOfExistingTask ?: classForApp(appDomain))
-		.putExtra(CONNECTOR_ID_OF_3NWEB_APP_INSTANCE, connectorId)
+	val intent = Intent(this, classForApp(appDomain))
 		.putExtra(APP_DOMAIN, appDomain)
+		.putExtra(CONNECTOR_ID_OF_3NWEB_APP_INSTANCE, connectorId)
 		.putExtra(APP_COMPONENT_ENTRYPOINT, entrypoint)
-		.setAction(Intent.ACTION_MAIN)
-	if (classOfExistingTask == null) {
-		intent
-			.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-			.addFlags(Intent.FLAG_ACTIVITY_MULTIPLE_TASK)
-	} else {
-		intent
-			.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-			.addFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP)
-	}
-	this.startActivity(intent)
+		.setAction(customIntentAction(START_APP_ACTION))
+		.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+		.addFlags(Intent.FLAG_ACTIVITY_MULTIPLE_TASK)
+	startActivity(intent)
+}
+
+fun GenericAppActivity.focus3NWebAppGUIComponent(
+	connectorId: String, appDomain: String, entrypoint: String,
+	classOfExistingTask: Class<out GenericAppActivity>
+) {
+	val intent = Intent(this, classOfExistingTask)
+		.putExtra(APP_DOMAIN, appDomain)
+		.putExtra(CONNECTOR_ID_OF_3NWEB_APP_INSTANCE, connectorId)
+		.putExtra(APP_COMPONENT_ENTRYPOINT, entrypoint)
+		.setAction(customIntentAction(FOCUS_APP_ACTION))
+		.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+		.addFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP)
+	startActivity(intent)
 }
 
 private fun classForApp(appDomain: String): Class<out GenericAppActivity> {
@@ -275,8 +380,6 @@ private fun classForApp(appDomain: String): Class<out GenericAppActivity> {
 
 private val activityCounter = AtomicInteger(0)
 
-class StartupAppActivity () : GenericAppActivity() {}
-class DashboardAppActivity () : GenericAppActivity() {}
 class ContactsAppActivity () : GenericAppActivity() {}
 class InboxAppActivity () : GenericAppActivity() {}
 class ChatAppActivity () : GenericAppActivity() {}

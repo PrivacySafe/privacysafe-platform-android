@@ -117,7 +117,8 @@ export class UserApps {
 			this.apps.closeAppsAfterUpdate.bind(this.apps),
 			getPlatform(),
 			this.getUserLoginSettings(),
-			this.r.caps.makeAutoStartupCAP
+			this.r.caps.makeAutoStartupCAP,
+			this.r.caps.makeNetworks
 		);
 		this.core = makeDriver(
 			conf, makeSystemCapFns,
@@ -459,7 +460,8 @@ function systemCAPsFrom(
 	triggerAllStartupLaunchers: () => Promise<void>,
 	closeAppsAfterUpdate: LiveApps['closeAppsAfterUpdate'],
 	platform: Platform, userLogin: UserLoginSettings|undefined,
-	makeAutoStartupCAP: PlatformResources['caps']['makeAutoStartupCAP']
+	makeAutoStartupCAP: PlatformResources['caps']['makeAutoStartupCAP'],
+	makeNetworks: PlatformResources['caps']['makeNetworks']
 ): SysUtils {
 	const apps: Apps = {
 		opener: {
@@ -512,7 +514,8 @@ function systemCAPsFrom(
 	};
 	const monitor = liveApps.makeMonitor();
 	const autoStartup = makeAutoStartupCAP?.();
-	return { apps, platform, monitor, userLogin, autoStartup };
+	const networks = makeNetworks?.();
+	return { apps, platform, monitor, userLogin, autoStartup, networks };
 }
 
 

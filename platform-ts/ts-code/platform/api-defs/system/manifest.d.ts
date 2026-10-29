@@ -27,6 +27,7 @@ declare namespace web3n.system {
 			logout?: true;
 			otherOpenUsers?: 'all';
 			userLogin?: 'all';
+			networks?: 'all';
 		};
 	}
 

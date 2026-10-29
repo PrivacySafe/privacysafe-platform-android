@@ -19,6 +19,7 @@
 /// <reference path="./apps.d.ts" />
 /// <reference path="./platform.d.ts" />
 /// <reference path="./monitor.d.ts" />
+/// <reference path="./networks.d.ts" />
 
 declare namespace web3n.system {
 
@@ -49,6 +50,8 @@ declare namespace web3n.system {
 		userLogin?: UserLoginSettings;
 
 		autoStartup?: AutoStartupSettings;
+
+		networks?: networks.Networks;
 
 	}
 

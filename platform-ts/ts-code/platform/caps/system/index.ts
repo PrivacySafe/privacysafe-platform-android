@@ -23,6 +23,7 @@ type SystemMonitor = web3n.system.monitor.SystemMonitor;
 type UserLogin = web3n.system.UserLoginSettings;
 type AutoStartup = web3n.system.AutoStartupSettings;
 type RequestedCAPs = web3n.system.RequestedCAPs;
+type NetworksCAP = web3n.system.networks.Networks;
 
 export interface TurnOffFns {
 	logout: () => Promise<void>;
@@ -53,6 +54,7 @@ export function makeSystemCAP(
 	const otherOpenUsers = makeOtherUsersCAP(otherUsersFns, sysReq);
 	const userLogin = makeSystemUserLoginCAP(systemCapFns.userLogin!, sysReq);
 	const autoStartup = makeAutoStartupCAP(systemCapFns.autoStartup!, sysReq);
+	const networks = makeNetworksCAP(systemCapFns.networks, sysReq);
 	return {
 		closeCurrentUserApps: logoutCAPs?.closeCurrentUserApps,
 		logout: logoutCAPs?.logout,
@@ -62,7 +64,8 @@ export function makeSystemCAP(
 		platform,
 		monitor,
 		userLogin,
-		autoStartup
+		autoStartup,
+		networks
 	};
 }
 
@@ -134,6 +137,14 @@ function makeAutoStartupCAP(
 ): SysUtils['autoStartup'] {
 	if (sysReq.monitor === 'all') {
 		return sysAutoStartupCapFns;
+	}
+}
+
+function makeNetworksCAP(
+	networks: NetworksCAP|undefined, sysReq: NonNullable<RequestedCAPs['system']>
+): SysUtils['networks'] {
+	if (sysReq.networks === 'all') {
+		return networks;
 	}
 }
 

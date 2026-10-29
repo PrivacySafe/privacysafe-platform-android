@@ -18,6 +18,8 @@ package app.privacysafe.jsengine
 
 import android.content.res.AssetManager
 import app.privacysafe.FnsForCoreInJS
+import app.privacysafe.Notifications
+import app.privacysafe.jsengine.caps.AddNotificationOp
 import app.privacysafe.jsengine.caps.AssetsListFolder
 import app.privacysafe.jsengine.caps.AssetsReadBytes
 import app.privacysafe.jsengine.caps.ConnectivityIsOnlineCheck
@@ -30,6 +32,7 @@ import app.privacysafe.jsengine.caps.UIFocusAppActivity
 import app.privacysafe.jsengine.caps.DecryptWithDeviceKey
 import app.privacysafe.jsengine.caps.EncryptWithDeviceKey
 import app.privacysafe.jsengine.caps.OpenExternalOps
+import app.privacysafe.jsengine.caps.RemoveNotificationOp
 import app.privacysafe.jsengine.caps.ScanUrlQROps
 import app.privacysafe.jsengine.ops.DelayFn
 import app.privacysafe.jsengine.ops.FhClose
@@ -73,7 +76,7 @@ private fun makeCommonInjectedFns(): Array<InjectedFn> {
 }
 
 fun makeCoreInjectedFns(
-	fns: FnsForCoreInJS, basePath: Path, assets: AssetManager, cryptoExec: Executor
+	fns: FnsForCoreInJS, basePath: Path, assets: AssetManager, cryptoExec: Executor, notifications: Notifications
 ): Array<InjectedFn> {
 	val descriptors = FileDescriptors(basePath)
 	val webSockets = WebSockets(fns.makePortForWS)
@@ -115,7 +118,9 @@ fun makeCoreInjectedFns(
 		OpenExternalOps(fns.openExternal),
 		ScanUrlQROps(fns.scanUrlQR),
 		NaclSBoxOpenOp(cryptoExec),
-		NaclSBoxPackOp(cryptoExec)
+		NaclSBoxPackOp(cryptoExec),
+		AddNotificationOp(notifications),
+		RemoveNotificationOp(notifications)
 	)
 }
 

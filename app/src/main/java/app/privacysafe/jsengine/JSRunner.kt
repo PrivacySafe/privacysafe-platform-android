@@ -29,6 +29,7 @@ import androidx.javascriptengine.JavaScriptSandbox.JS_FEATURE_WASM_COMPILATION
 import androidx.javascriptengine.JavaScriptSandbox.JS_FEATURE_ISOLATE_MAX_HEAP_SIZE
 import androidx.javascriptengine.JavaScriptSandbox.JS_FEATURE_ISOLATE_TERMINATION
 import app.privacysafe.FnsForCoreInJS
+import app.privacysafe.Notifications
 import app.privacysafe.execBlocking
 import app.privacysafe.jsengine.caps.StartJSEngineComponentOp
 import app.privacysafe.jsengine.ops.DisconnectFromCoreOp
@@ -53,7 +54,8 @@ const val NUM_OF_CRYPTOR_THREADS = 4
 @SuppressLint("RequiresFeature")
 class JSRunner(
 	ctx: Context,
-	uiFns: FnsForCoreInJS
+	uiFns: FnsForCoreInJS,
+	notifications: Notifications
 ) {
 
 	/**
@@ -89,7 +91,11 @@ class JSRunner(
 				val dataDir = ctx.dataDir.absolutePath
 				core = CoreRunner(
 					makeAndConfigureNewIsolate(jsHas), jsHas,
-					makeCoreInjectedFns(uiFns, Path(dataDir), assets, Executors.newFixedThreadPool(NUM_OF_CRYPTOR_THREADS)),
+					makeCoreInjectedFns(
+						uiFns, Path(dataDir), assets,
+						Executors.newFixedThreadPool(NUM_OF_CRYPTOR_THREADS),
+						notifications
+					),
 					assets, executor, scope, dataDir
 				)
 				whenCoreSet!!.complete(core)
@@ -179,6 +185,18 @@ class JSRunner(
 		return scope.execBlocking {
 			whenInitialized()
 			core.coreFns.processURLBeforeLogin(url)
+		}
+	}
+
+	fun notificationClicked(notificationId: Int) {
+		scope.launch {
+			core.coreFns.notificationClicked(notificationId)
+		}
+	}
+
+	fun notificationDismissed(notificationId: Int) {
+		scope.launch {
+			core.coreFns.notificationDismissed(notificationId)
 		}
 	}
 

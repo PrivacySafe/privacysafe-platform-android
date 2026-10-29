@@ -178,7 +178,7 @@ class CallsIntoCore (
 		return callWithReturned<StringValue>("getSignedUserIdEventually").value
 	}
 
-	private fun readBytesFromFileInAppCodeFS(connectorId: String, path: String, start: Int, end: Int): ByteArray? {
+	private fun readBytesFromFileInAppCodeFS(connectorId: String, path: String, start: Int, end: Int): ByteArray {
 		return ioScope.execBlocking {
 			callReturningBytes(
 				"readBytesFromFileInAppCodeFS",
@@ -201,6 +201,17 @@ class CallsIntoCore (
 		}
 	}
 
+	fun notificationClicked(notificationId: Int) {
+		callReturningVoid("notificationClicked", NotificationId(notificationId))
+	}
+
+	fun notificationDismissed(notificationId: Int) {
+		callReturningVoid("notificationDismissed", NotificationId(notificationId))
+
+	}
+
+	@Serializable
+	data class NotificationId(val id: Int)
 }
 
 private const val BUFFER_SIZE_TO_READ_CODE = 128*1024

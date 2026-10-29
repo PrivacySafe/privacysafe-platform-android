@@ -17,7 +17,10 @@
 	<string name="tap_to_login_notification_txt">Tap to Login</string>
 
 	<string name="notification_perm_dialog_title">Missing permission</string>
-	<string name="notification_perm_dialog_message">Need permission to run</string>
+	<string name="notification_perm_dialog_message">
+		Without notifications permission, notifications from Chat and other 3NWeb apps will not show.
+		You can enable notifications in Android settings for PrivacySafe.
+	</string>
 
 	<string name="missing_sandbox_dialog_title">Older Android system</string>
 	<string name="missing_sandbox_dialog_message">

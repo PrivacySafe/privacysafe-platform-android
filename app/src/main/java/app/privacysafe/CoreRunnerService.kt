@@ -16,23 +16,17 @@
 */
 package app.privacysafe
 
-import android.app.Notification
-import android.app.NotificationChannel
-import android.app.NotificationManager
-import android.app.PendingIntent
 import android.app.Service
 import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
 import android.content.ServiceConnection
 import android.net.ConnectivityManager
-import android.net.Network
 import android.os.Binder
 import android.os.IBinder
 import android.util.Log
 import android.webkit.WebResourceResponse
 import android.webkit.WebView
-import androidx.core.app.NotificationCompat
 import app.privacysafe.jsengine.AppGUIComponent
 import app.privacysafe.jsengine.JSRunner
 import app.privacysafe.jsengine.caps.CloseActivityOp
@@ -52,6 +46,7 @@ import kotlinx.coroutines.launch
 import java.io.FileNotFoundException
 import kotlin.system.exitProcess
 import androidx.core.net.toUri
+import kotlin.time.Duration.Companion.milliseconds
 
 class CoreRunnerService : Service() {
 
@@ -61,15 +56,16 @@ class CoreRunnerService : Service() {
 	private var loggedUserId: String? = null
 	private var deferredLogin: CompletableDeferred<Unit?>? = null
 	private var nonSystemAppToOpenWhenLoggedIn: String? = null
-	private lateinit var notifications: NotificationManager
+	private lateinit var notifications: Notifications
 
 	val connectivityIndicator = ConnectivityIndicator()
 
 	override fun onCreate() {
 		super.onCreate()
-		notifications = getSystemService(NOTIFICATION_SERVICE) as NotificationManager
+		notifications = Notifications(this)
 		connectivityIndicator.initialize(getSystemService(CONNECTIVITY_SERVICE) as ConnectivityManager)
-		startForeground(1, makeNewNotification())
+		val mainNotification = notifications.makeMainNotification(loggedUserId)
+		startForeground(mainNotification.first, mainNotification.second)
 		initJSRunnerAndWirePostLogin()
 	}
 
@@ -81,41 +77,26 @@ class CoreRunnerService : Service() {
 
 	private fun initJSRunnerAndWirePostLogin() {
 		deferredLogin = CompletableDeferred()
-		jsrunner = JSRunner(applicationContext, FnsForCoreInJS())
+		jsrunner = JSRunner(this, FnsForCoreInJS(), notifications)
 		jsrunner.scope.launch {
 			try {
 				loggedUserId = jsrunner.whenUserSignedIn()
 				this@CoreRunnerService.deferredLogin?.complete(null)
 				this@CoreRunnerService.deferredLogin = null
-				notifications.notify(1, makeNewNotification())
+				notifications.publishMainNotification(loggedUserId)
 				val appToOpen = nonSystemAppToOpenWhenLoggedIn
 				nonSystemAppToOpenWhenLoggedIn = null
 				if (appToOpen != null) {
 					jsrunner.scope.launch {
-						delay(100)
+						delay(100.milliseconds)
 						this@CoreRunnerService.start3NWebAppGUIComponent(appToOpen)
 					}
 				}
 			} catch (err: Throwable) {
 				this@CoreRunnerService.deferredLogin?.completeExceptionally(err)
-				notifications.cancel(1)
+				notifications.removeAll()
 			}
 		}
-	}
-
-	private fun makeNewNotification(): Notification {
-		return NotificationCompat.Builder(this, CORE_RUNNER_NOTIFICATIONS_CHANNEL_ID)
-			.setSmallIcon(R.drawable.app_logo)
-			.setContentTitle(resources.getString(R.string.app_name))
-			.setPriority(NotificationCompat.PRIORITY_LOW)
-			.setContentText(if (loggedUserId == null) {
-				getString(R.string.tap_to_login_notification_txt)
-			} else {
-				loggedUserId
-			})
-			// can start launcher app only from app activity, so, startup talks to service that focuses/opens launcher
-			.setContentIntent(intentToOpenStartUpFromNotification())
-			.build()
 	}
 
 	private fun removeNotRunningAppTasks() {
@@ -158,6 +139,17 @@ class CoreRunnerService : Service() {
 	fun openLauncher() {
 		if (!jsrunner.findAndFocusOpenAppInstance(Bundled.launcherDomain)) {
 			start3NWebAppGUIComponent(Bundled.launcherDomain)
+		}
+	}
+
+	private fun notificationTriggered(notificationId: Int) {
+		jsrunner.scope.launch {
+			delay(200.milliseconds)
+			notifications.removeAppNotification(notificationId)
+
+			// TODO
+			jsrunner.notificationClicked(notificationId)
+
 		}
 	}
 
@@ -231,18 +223,27 @@ class CoreRunnerService : Service() {
 			}
 		}
 
+		fun notificationClicked(notificationId: Int) {
+			notificationTriggered(notificationId)
+		}
+
 		fun openLauncher() {
 			this@CoreRunnerService.openLauncher()
 		}
 
 		fun loginAndOpenApp(appDomain: String) {
-			assert((appDomain != Bundled.startupDomain) && (appDomain != Bundled.launcherDomain))
-			nonSystemAppToOpenWhenLoggedIn = appDomain
+			if ((appDomain != Bundled.startupDomain) && (appDomain != Bundled.launcherDomain)) {
+				nonSystemAppToOpenWhenLoggedIn = appDomain
+			}
 			start3NWebAppGUIComponent(Bundled.startupDomain)
 		}
 
-		fun findAnFocusOpenAppInstance(appDomain: String): Boolean {
-			return jsrunner.findAndFocusOpenAppInstance(appDomain)
+		fun findAndFocusOpenAppInstance(appDomain: String, notificationId: Int?): Boolean {
+			val found = jsrunner.findAndFocusOpenAppInstance(appDomain)
+			if (found && (notificationId != null) && (appDomain == Bundled.launcherDomain)) {
+				notificationTriggered(notificationId)
+			}
+			return found
 		}
 
 	}
@@ -330,7 +331,6 @@ class CoreRunnerService : Service() {
 		}
 
 		fun setActive(isActive: Boolean) {
-			Log.d("w3n", "$appDomain set ${if (isActive) "active" else "idle"}")
 			component.setActive(isActive)
 		}
 
@@ -391,6 +391,10 @@ class CoreRunnerService : Service() {
 			focus: () -> Unit
 		) {
 			component.setUICallbacks(close, focus)
+		}
+
+		fun notificationClicked(notificationId: Int) {
+			notificationTriggered(notificationId)
 		}
 
 	}
@@ -459,49 +463,5 @@ fun GenericAppActivity.bindCoreService(appDomain: String): Pair<ServiceConnectio
 		intent.setAction(customIntentAction(BIND_FOR_3NWEB_APP_ACTION))
 			.putExtra(APP_DOMAIN, appDomain)
 	}
-}
-
-private const val CORE_RUNNER_NOTIFICATIONS_CHANNEL_ID = "core-runner"
-
-fun addCoreRunnerNotificationChannelTo(ctx: Context, notifications: NotificationManager) {
-	if (notifications.getNotificationChannel(CORE_RUNNER_NOTIFICATIONS_CHANNEL_ID) != null) {
-		return
-	}
-	val coreChannel = NotificationChannel(
-		CORE_RUNNER_NOTIFICATIONS_CHANNEL_ID,
-		ctx.getString(R.string.core_runner_channel),
-		NotificationManager.IMPORTANCE_LOW
-	)
-	coreChannel.description = ctx.getString(R.string.core_runner_channel_description)
-	coreChannel.setShowBadge(false)
-	notifications.createNotificationChannel(coreChannel)
-}
-
-class ConnectivityIndicator(
-) : ConnectivityManager.NetworkCallback() {
-
-	private lateinit var mng: ConnectivityManager
-
-	private var availableNetwork: Network? = null
-
-	fun initialize(m: ConnectivityManager) {
-		mng = m
-		m.registerDefaultNetworkCallback(this)
-	}
-
-	val initialized get() = this::mng.isInitialized
-
-	fun hasAvailableNetwork(): Boolean {
-		return (availableNetwork != null)
-	}
-
-	override fun onAvailable(network: Network) {
-		availableNetwork = network
-	}
-
-	override fun onLost(network: Network) {
-		availableNetwork = null
-	}
-
 }
 

@@ -1,0 +1,14 @@
+syntax = "proto2";
+
+package notifications_op;
+
+message AddNotificationsArgs {
+	required string app_domain = 1;
+	required string title = 2;
+	required string body = 3;
+	required bool silent = 4;
+}
+
+message NotificationId {
+  required int32 id = 1;
+}

@@ -28,6 +28,7 @@ type Platform = web3n.system.platform.Platform;
 type PlatformDownloader = web3n.system.platform.PlatformDownloader;
 type PlatformUpdateEvents = web3n.system.platform.PlatformUpdateEvents;
 type AppsOpener = web3n.system.apps.AppsOpener;
+type Networks = web3n.system.networks.Networks;
 type SystemMonitor = web3n.system.monitor.SystemMonitor;
 type UserLoginSettings = web3n.system.UserLoginSettings;
 type AutoStartupSettings = web3n.system.AutoStartupSettings;
@@ -44,13 +45,17 @@ export function makeSystemCaller(caller: Caller, sysPath: string[]): SysUtils {
 	const lstPlatformCAP = (lstSystemCAP.includes('platform') ?
 		caller.listObj(sysPath.concat('platform')) as (keyof Platform)[] : undefined
 	);
-	return makeSystemBasedOnListing(caller, sysPath, lstSystemCAP, lstPlatformCAP, lstAppsCAP);
+	const lstNetworksCAP = (lstSystemCAP.includes('networks') ?
+		caller.listObj(sysPath.concat('networks')) as (keyof Networks)[] : undefined
+	);
+	return makeSystemBasedOnListing(caller, sysPath, lstSystemCAP, lstPlatformCAP, lstAppsCAP, lstNetworksCAP);
 }
 
 function makeSystemBasedOnListing(
 	caller: Caller, sysPath: string[], lstSystemCAP: (keyof SysUtils)[],
 	lstPlatformCAP: (keyof Platform)[]|undefined,
-	lstAppsCAP: (keyof NonNullable<SysUtils['apps']>)[]|undefined
+	lstAppsCAP: (keyof NonNullable<SysUtils['apps']>)[]|undefined,
+	lstNetworkCAP: (keyof Networks)[]|undefined
 ): SysUtils {
 	const system: SysUtils = {};
 	if (lstAppsCAP) {
@@ -93,6 +98,10 @@ function makeSystemBasedOnListing(
 		const otherOpenUsersPath = sysPath.concat('otherOpenUsers');
 		system.otherOpenUsers = makeOtherOpenUsersCaller(caller, otherOpenUsersPath);
 	}
+	if (lstSystemCAP.includes('networks')) {
+		const networksPath = sysPath.concat('networks');
+		system.networks = makeNetworksCaller(lstNetworkCAP!, caller, networksPath);
+	}
 	return system;
 }
 
@@ -113,7 +122,11 @@ export async function promiseSystemCaller(
 		(await caller.listObjAsync(sysPath.concat('platform'))) as (keyof Platform)[] :
 		undefined
 	);
-	return makeSystemBasedOnListing(caller, sysPath, lstSystemCAP, lstPlatformCAP, lstAppsCAP);
+	const lstNetworksCAP = (lstSystemCAP.includes('networks') ?
+		(await caller.listObjAsync(sysPath.concat('networks'))) as (keyof Networks)[] :
+		undefined
+	);
+	return makeSystemBasedOnListing(caller, sysPath, lstSystemCAP, lstPlatformCAP, lstAppsCAP, lstNetworksCAP);
 }
 
 function makeAppsFollowingListing(
@@ -336,6 +349,40 @@ function callOtherOpenUsers<M extends keyof OtherOpenUsers>(
 	caller: Caller, objPath: string[], method: M
 ): OtherOpenUsers[M] {
 	return jsonCall.makeReqRepObjCaller<OtherOpenUsers, M>(caller, objPath, method);
+}
+
+function makeNetworksCaller(
+	lstNetworksCAP: (keyof Networks)[], caller: Caller, objPath: string[]
+): Networks {
+	const dnsAndIpPath = objPath.concat('dnsAndIP');
+	const networks: Networks = {
+		dnsAndIP: {
+			currentProxy: callDnsAndIpNetworks(caller, dnsAndIpPath, 'currentProxy'),
+			setCurrentProxy: callDnsAndIpNetworks(caller, dnsAndIpPath, 'setCurrentProxy'),
+			testProxySetup: callDnsAndIpNetworks(caller, dnsAndIpPath, 'testProxySetup')
+		}
+	};
+	if (lstNetworksCAP.includes('onion')) {
+		const onionPath = objPath.concat('onion');
+		networks.onion = {
+			testConnection: callOnionNetworks(caller, onionPath, 'testConnection'),
+			setTorProxy: callOnionNetworks(caller, onionPath, 'setTorProxy'),
+			currentSetup: callOnionNetworks(caller, onionPath, 'currentSetup'),
+		};
+	}
+	return networks;
+}
+
+function callDnsAndIpNetworks<M extends keyof Networks['dnsAndIP']>(
+	caller: Caller, objPath: string[], method: M
+): Networks['dnsAndIP'][M] {
+	return jsonCall.makeReqRepObjCaller<Networks['dnsAndIP'], M>(caller, objPath, method);
+}
+
+function callOnionNetworks<M extends keyof NonNullable<Networks['onion']>>(
+	caller: Caller, objPath: string[], method: M
+): NonNullable<Networks['onion']>[M] {
+	return jsonCall.makeReqRepObjCaller<NonNullable<Networks['onion']>, M>(caller, objPath, method);
 }
 
 

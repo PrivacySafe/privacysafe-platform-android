@@ -53,6 +53,7 @@ type RequestedCAPs = web3n.caps.RequestedCAPs;
 type ConnectivityCAP = web3n.connectivity.Connectivity;
 type FormFactor = web3n.ui.FormFactor;
 type FSItem = web3n.files.FSItem;
+type NetworksCAP = web3n.system.networks.Networks;
 
 export interface CAPsImpls {
 
@@ -73,6 +74,8 @@ export interface CAPsImpls {
 	makeConnectivity?: (connectivityEvents: Promise<Core['connectivityEvents']>) => {
 		makeCAP: () => { cap: ConnectivityCAP; }; close: () => void;
 	}
+
+	makeNetworks?: () => NetworksCAP;
 
 }
 

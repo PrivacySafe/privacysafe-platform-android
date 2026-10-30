@@ -254,7 +254,13 @@ class CoreRunnerService : Service() {
 
 		val startAndroidActivity: StartActivityOp = { connectorId, appDomain, entrypoint ->
 			jsrunner.makeAppGUIComponent(connectorId, appDomain, entrypoint)
-			start3NWebAppGUIComponent(connectorId, appDomain, entrypoint)
+
+			// TODO these should be based on app manifest
+			val requiredPermissions = if (appDomain == Bundled.chatDomain) {
+				arrayListOf(Permission.RECORD_AUDIO, Permission.CAMERA)
+			} else { null }
+
+			start3NWebAppGUIComponent(connectorId, appDomain, entrypoint, requiredPermissions)
 		}
 
 		val closeActivity: CloseActivityOp = { connectorId ->

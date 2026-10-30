@@ -58,8 +58,16 @@ abstract class GenericAppActivity() : ComponentActivity() {
 		}
 		val (conn, coreDef) = bindCoreService(appDomain)
 		appSrvConn = conn
+
+		val permissionRequester = intent.extras!!.getStringArrayList(REQUIRED_PERMISSIONS).let { p ->
+			if (!p.isNullOrEmpty()) { checkMultiplePermissionsAndRegisterRequesterIfNeeded(p) } else { null }
+		}
+
 		scope.launch {
 			try {
+				if (permissionRequester != null) {
+					permissionRequester()
+				}
 				val coreSrv = coreDef.await()
 				if (setup(coreSrv)) {
 					core.setActive(true)
@@ -81,20 +89,6 @@ abstract class GenericAppActivity() : ComponentActivity() {
 		if (!coreSrv.isUserLoggedIn) {
 			coreSrv.loginAndOpenApp(appDomain)
 			return false
-		}
-
-		// TODO
-		//  - info about required permissions should be available here
-		//  - should manifest, or parameters from it be in intent's extra's?
-
-		val permissionRequester = if (appDomain == Bundled.chatDomain) {
-			checkMultiplePermissionsAndRegisterRequesterIfNeeded(
-				Permission.RECORD_AUDIO, Permission.CAMERA,
-			)
-		} else { null }
-
-		if (permissionRequester != null) {
-			permissionRequester()
 		}
 
 		return if (intent.action == Intent.ACTION_MAIN) {
@@ -306,6 +300,7 @@ const val APP_COMPONENT_ENTRYPOINT = "app-component-entrypoint"
 const val CONNECTOR_ID_OF_3NWEB_APP_INSTANCE = "connector-id"
 private const val APP_URL_HASH = "app-url-hash"
 private const val NOTIFICATION_ID = "notification-id"
+private const val REQUIRED_PERMISSIONS = "required permissions"
 
 fun CoreRunnerService.startStartupApp(startupUrlHash: String?) {
 	val intent = intentToOpenApp(Bundled.startupDomain)
@@ -329,7 +324,7 @@ fun CoreRunnerService.start3NWebAppGUIComponent(appDomain: String) {
 }
 
 fun CoreRunnerService.start3NWebAppGUIComponent(
-	connectorId: String, appDomain: String, entrypoint: String
+	connectorId: String, appDomain: String, entrypoint: String, requiredPermissions: ArrayList<String>?
 ) {
 	val intent = Intent(this, classForApp(appDomain))
 		.putExtra(APP_DOMAIN, appDomain)
@@ -338,6 +333,9 @@ fun CoreRunnerService.start3NWebAppGUIComponent(
 		.setAction(customIntentAction(START_APP_ACTION))
 		.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
 		.addFlags(Intent.FLAG_ACTIVITY_MULTIPLE_TASK)
+	if (!requiredPermissions.isNullOrEmpty()) {
+		intent.putExtra(REQUIRED_PERMISSIONS, requiredPermissions)
+	}
 	startActivity(intent)
 }
 

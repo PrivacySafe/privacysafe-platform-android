@@ -213,7 +213,7 @@ fun checkPermissionAndRegisterRequesterIfNeeded(
 }
 
 fun GenericAppActivity.checkMultiplePermissionsAndRegisterRequesterIfNeeded(
-	vararg permissions: String
+	permissions: ArrayList<String>
 ): (suspend () -> Map<String, Boolean>)? {
 	val missingPermissions = mutableListOf<String>()
 	for (permission in permissions) {

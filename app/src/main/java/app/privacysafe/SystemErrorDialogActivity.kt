@@ -16,11 +16,11 @@
 */
 package app.privacysafe
 
-import android.app.AlertDialog
 import android.content.Context
 import android.content.Intent
 import android.os.Bundle
 import androidx.activity.ComponentActivity
+import app.privacysafe.utils.showAlertDialog
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -33,10 +33,11 @@ class SystemDialogActivity : ComponentActivity() {
 		super.onCreate(savedInstanceState)
 		setContentView(R.layout.system_dialogs_layout)
 		scope.launch {
-			showAlertDialogIn(
-				this@SystemDialogActivity,
+			showAlertDialog(
 				intent.extras?.getString(DIALOG_TITLE) ?: "",
-				intent.extras?.getString(DIALOG_CONTENT) ?: ""
+				intent.extras?.getString(DIALOG_CONTENT) ?: "",
+				getString(R.string.ok_btn_txt)
+
 			)
 		}
 	}

@@ -26,6 +26,11 @@ import android.webkit.WebView
 import android.widget.TextView
 import androidx.activity.ComponentActivity
 import androidx.activity.OnBackPressedCallback
+import app.privacysafe.utils.Bundled
+import app.privacysafe.utils.checkMultiplePermissionsAndRegisterRequesterIfNeeded
+import app.privacysafe.utils.customActionIn
+import app.privacysafe.utils.customIntentAction
+import app.privacysafe.utils.makeSequentialIntegerIdGenerator
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch

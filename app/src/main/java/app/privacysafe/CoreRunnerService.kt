@@ -46,6 +46,13 @@ import kotlinx.coroutines.launch
 import java.io.FileNotFoundException
 import kotlin.system.exitProcess
 import androidx.core.net.toUri
+import app.privacysafe.utils.Bundled
+import app.privacysafe.utils.Permission
+import app.privacysafe.utils.customActionIn
+import app.privacysafe.utils.customIntentAction
+import app.privacysafe.utils.getActivityManager
+import app.privacysafe.utils.mimeFromFileExt
+import app.privacysafe.utils.reverseDomain
 import kotlin.time.Duration.Companion.milliseconds
 
 class CoreRunnerService : Service() {

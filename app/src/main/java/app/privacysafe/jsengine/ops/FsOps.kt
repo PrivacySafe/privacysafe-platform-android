@@ -17,7 +17,7 @@
 package app.privacysafe.jsengine.ops
 
 import android.os.StatFs
-import app.privacysafe.RuntimeException
+import app.privacysafe.utils.RuntimeException
 import app.privacysafe.jsengine.InjectedSyncHandler
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.Serializable

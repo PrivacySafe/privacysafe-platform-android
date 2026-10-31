@@ -16,7 +16,7 @@
 */
 package app.privacysafe.jsengine.ops.nacl
 
-import app.privacysafe.computeAsync
+import app.privacysafe.utils.computeAsync
 import app.privacysafe.jsengine.InjectedAsyncHandler
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.Serializable

@@ -30,12 +30,12 @@ import androidx.javascriptengine.JavaScriptSandbox.JS_FEATURE_ISOLATE_MAX_HEAP_S
 import androidx.javascriptengine.JavaScriptSandbox.JS_FEATURE_ISOLATE_TERMINATION
 import app.privacysafe.FnsForCoreInJS
 import app.privacysafe.Notifications
-import app.privacysafe.execBlocking
+import app.privacysafe.utils.execBlocking
 import app.privacysafe.jsengine.caps.StartJSEngineComponentOp
 import app.privacysafe.jsengine.ops.DisconnectFromCoreOp
 import app.privacysafe.jsengine.ops.ListCoreObjPathOp
 import app.privacysafe.jsengine.ops.MakePortForWS
-import app.privacysafe.readToString
+import app.privacysafe.utils.readToString
 import app.privacysafe.webview.GetAppResource
 import app.privacysafe.webview.setup3NWeb
 import kotlinx.coroutines.CompletableDeferred

@@ -1,42 +1,26 @@
-/*
- Copyright (C) 2026 3NSoft Inc.
-
- This program is free software: you can redistribute it and/or modify it under
- the terms of the GNU General Public License as published by the Free Software
- Foundation, either version 3 of the License, or (at your option) any later
- version.
-
- This program is distributed in the hope that it will be useful, but
- WITHOUT ANY WARRANTY; without even the implied warranty of
- MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
- See the GNU General Public License for more details.
-
- You should have received a copy of the GNU General Public License along with
- this program. If not, see <http://www.gnu.org/licenses/>.
-*/
-package app.privacysafe
+package app.privacysafe.utils
 
 import android.Manifest
 import android.app.ActivityManager
-import android.app.AlertDialog
 import android.content.Context
 import android.content.Intent
-import android.content.pm.PackageManager
 import android.webkit.PermissionRequest
-import androidx.activity.ComponentActivity
-import androidx.activity.result.contract.ActivityResultContracts
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
+import kotlinx.serialization.json.Json
 import java.io.BufferedReader
 import java.io.InputStream
+import java.nio.file.Files
+import java.nio.file.Path
+import java.nio.file.StandardOpenOption
 import java.util.concurrent.CompletableFuture
 import java.util.concurrent.ExecutionException
 import java.util.concurrent.Executor
 import java.util.concurrent.atomic.AtomicInteger
 import java.util.concurrent.atomic.AtomicLong
 import kotlin.io.encoding.Base64
-import kotlin.io.encoding.ExperimentalEncodingApi
+import kotlin.io.path.Path
 
 fun makeSequentialStringIdGenerator(): () -> String {
 	val idCount = AtomicLong(0)
@@ -53,14 +37,12 @@ fun makeSequentialIntegerIdGenerator(): () -> Int {
 	}
 }
 
-@OptIn(ExperimentalEncodingApi::class)
 fun String.decodeBase64(): ByteArray {
-	return Base64.Default.decode(this)
+	return Base64.decode(this)
 }
 
-@OptIn(ExperimentalEncodingApi::class)
 fun ByteArray.toBase64(): String {
-	return Base64.Default.encode(this)
+	return Base64.encode(this)
 }
 
 private val extToMime = mapOf<String, String>(
@@ -125,18 +107,6 @@ suspend fun <T> Executor.computeAsync(code: () -> T): T {
 	return deferred.await()
 }
 
-fun showAlertDialog(ctx: Context, title: String, msg: String) {
-	AlertDialog.Builder(ctx)
-		.setTitle(title)
-		.setMessage(msg)
-		.setPositiveButton("OK", { _dialog, _which ->
-		})
-		.setNegativeButton("Cancel", { _dialog, _which ->
-		})
-		.create()
-		.show()
-}
-
 /**
  * Systematic collection of constants, relevant to bundling and usage of bundled assets.
  */
@@ -176,83 +146,6 @@ interface Permission {
 
 }
 
-suspend fun checkAndRequestPermission(activity: ComponentActivity, permission: String): Boolean {
-	if (activity.checkSelfPermission(permission) == PackageManager.PERMISSION_GRANTED) {
-		return true
-	}
-	val deferred = CompletableDeferred<Boolean>()
-	val requester = activity.registerForActivityResult(ActivityResultContracts.RequestPermission()) {
-		isGranted -> deferred.complete(isGranted)
-	}
-	try {
-		requester.launch(permission)
-		return deferred.await()
-	} finally {
-		requester.unregister()
-	}
-}
-
-fun checkPermissionAndRegisterRequesterIfNeeded(
-	activity: ComponentActivity, permission: String
-): (suspend () -> Boolean)? {
-	if (activity.checkSelfPermission(permission) == PackageManager.PERMISSION_GRANTED) {
-		return null
-	}
-	val deferred = CompletableDeferred<Boolean>()
-	val requester = activity.registerForActivityResult(ActivityResultContracts.RequestPermission()) {
-			isGranted -> deferred.complete(isGranted)
-	}
-	return suspend {
-		try {
-			requester.launch(permission)
-			deferred.await()
-		} finally {
-			requester.unregister()
-		}
-	}
-}
-
-fun GenericAppActivity.checkMultiplePermissionsAndRegisterRequesterIfNeeded(
-	permissions: ArrayList<String>
-): (suspend () -> Map<String, Boolean>)? {
-	val missingPermissions = mutableListOf<String>()
-	for (permission in permissions) {
-		if (checkSelfPermission(permission) != PackageManager.PERMISSION_GRANTED) {
-			missingPermissions.add(permission)
-		}
-	}
-	if (missingPermissions.isEmpty()) {
-		return null
-	}
-	val deferred = CompletableDeferred<Map<String, Boolean>>()
-	val requester = registerForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) {
-			grants -> deferred.complete(grants)
-	}
-	return suspend {
-		try {
-			requester.launch(missingPermissions.toTypedArray())
-			deferred.await()
-		} finally {
-			requester.unregister()
-		}
-	}
-}
-
-suspend fun showAlertDialogIn(activity: ComponentActivity, title: String, msg: String) {
-	val deferred = CompletableDeferred<Unit?>()
-	val dialog = AlertDialog.Builder(activity)
-		.setTitle(title)
-		.setMessage(msg)
-		.setOnCancelListener {
-			deferred.complete(null)
-		}
-		.setOnDismissListener {
-			deferred.complete(null)
-		}
-	dialog.show()
-	deferred.await()
-}
-
 fun Context.getActivityManager(): ActivityManager {
 	return getSystemService(Context.ACTIVITY_SERVICE) as ActivityManager
 }
@@ -270,41 +163,41 @@ fun Context.customActionIn(intent: Intent): String? {
 	}
 }
 
+private const val ANDROID_UTIL_FOLDER = "util-android"
 
+fun Context.pathInAndroidUtilFolder(pathInUtil: String): Path {
+	val dataDir = dataDir.absolutePath
+	return Path("$dataDir/${ANDROID_UTIL_FOLDER}/${pathInUtil}")
+}
 
+fun Context.readFileBytesFromAndroidUtil(pathInUtil: String): ByteArray? {
+	val fPath = pathInAndroidUtilFolder(pathInUtil)
+	return if (Files.exists(fPath)) {
+		Files.readAllBytes(fPath)
+	} else { null }
+}
 
+fun Context.writeFileIntoAndroidUtil(pathInUtil: String, content: ByteArray) {
+	val fPath = pathInAndroidUtilFolder(pathInUtil)
+	Files.createDirectories(fPath.parent)
+	Files.write(fPath, content, StandardOpenOption.CREATE)
+}
 
+fun Context.readFileFromAndroidUtil(pathInUtil: String): String? {
+	val binaryContent = readFileBytesFromAndroidUtil(pathInUtil)
+	return if (binaryContent != null) {
+		String(binaryContent, Charsets.UTF_8)
+	} else { null }
+}
 
+inline fun <reified T> Context.readJsonFileFromAndroidUtil(pathInUtil: String): T? {
+	val txtContent = readFileFromAndroidUtil(pathInUtil)
+	return if (txtContent != null) {
+		Json.decodeFromString<T>(txtContent)
+	} else { null }
+}
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+inline fun <reified T> Context.writeJsonFileIntoAndroidUtil(pathInUtil: String, json: T) {
+	val txtContent = Json.encodeToString(json)
+	writeFileIntoAndroidUtil(pathInUtil, txtContent.encodeToByteArray())
+}

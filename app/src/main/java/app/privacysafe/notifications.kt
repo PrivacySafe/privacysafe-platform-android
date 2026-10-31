@@ -24,6 +24,7 @@ import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import androidx.core.app.NotificationCompat
 import androidx.core.graphics.drawable.IconCompat
+import app.privacysafe.utils.makeSequentialIntegerIdGenerator
 
 
 private const val CORE_RUNNER_NOTIFICATIONS_CHANNEL_ID = "core-runner"

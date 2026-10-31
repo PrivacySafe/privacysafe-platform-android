@@ -28,6 +28,9 @@
 		device, or use another one.
 	</string>
 
+	<string name="close_btn_txt">Close</string>
+	<string name="ok_btn_txt">Ok</string>
+
 	<string name="start_err_dialog_title">Something went wrong</string>
 	<string name="start_err_dialog_message">
 		Unexpect error prevents PrivacySafe from starting up

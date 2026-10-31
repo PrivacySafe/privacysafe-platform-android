@@ -22,6 +22,11 @@ import android.content.ServiceConnection
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.javascriptengine.SandboxUnsupportedException
+import app.privacysafe.utils.Permission
+import app.privacysafe.utils.PermissionsAlerts
+import app.privacysafe.utils.canShowAlertAboutMissingPermission
+import app.privacysafe.utils.checkPermissionAndRegisterRequesterIfNeeded
+import app.privacysafe.utils.showAlertDialog
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -39,15 +44,15 @@ class InitActivity : ComponentActivity() {
 		super.onCreate(savedInstanceState)
 		setContentView(R.layout.init_layout)
 		notifications = getSystemService(NOTIFICATION_SERVICE) as NotificationManager
-		val permissionRequester = checkPermissionAndRegisterRequesterIfNeeded(this, Permission.POST_NOTIFICATIONS)
+		val permissionRequester = checkPermissionAndRegisterRequesterIfNeeded(Permission.POST_NOTIFICATIONS)
 
 		scope.launch {
 			val havePermissions = if (permissionRequester == null) { true } else { permissionRequester() }
-			if (!havePermissions) {
-				showAlertDialogIn(
-					this@InitActivity,
+			if (!havePermissions && canShowAlertAboutMissingPermission(2, PermissionsAlerts.POST_NOTIFICATIONS)) {
+				showAlertDialog(
 					getString(R.string.notification_perm_dialog_title),
-					getString(R.string.notification_perm_dialog_message)
+					getString(R.string.notification_perm_dialog_message),
+					getString(R.string.ok_btn_txt)
 				)
 			}
 			startCoreServiceAndForwardToSystemApp()
@@ -86,16 +91,16 @@ class InitActivity : ComponentActivity() {
 			core.whenJSRunnerInitialized()
 			return
 		} catch (_: SandboxUnsupportedException) {
-			showAlertDialogIn(
-				this,
+			showAlertDialog(
 				resources.getString(R.string.missing_sandbox_dialog_title),
-				resources.getString(R.string.missing_sandbox_dialog_message)
+				getString(R.string.missing_sandbox_dialog_message),
+				getString(R.string.close_btn_txt)
 			)
 		} catch (err: Throwable) {
-			showAlertDialogIn(
-				this,
+			showAlertDialog(
 				resources.getString(R.string.start_err_dialog_title),
-				"${resources.getString(R.string.start_err_dialog_message)}\n${err.stackTraceToString()}"
+				"${getString(R.string.start_err_dialog_message)}\n${err.stackTraceToString()}",
+				getString(R.string.close_btn_txt)
 			)
 		}
 		finishAndRemoveTask()

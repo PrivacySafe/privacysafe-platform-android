@@ -22,7 +22,7 @@ import android.util.Log
 import androidx.javascriptengine.JavaScriptConsoleCallback.ConsoleMessage
 import androidx.javascriptengine.JavaScriptIsolate
 import androidx.javascriptengine.TerminationInfo
-import app.privacysafe.execBlocking
+import app.privacysafe.utils.execBlocking
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.serialization.ExperimentalSerializationApi

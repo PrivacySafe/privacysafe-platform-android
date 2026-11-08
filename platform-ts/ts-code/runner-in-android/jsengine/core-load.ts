@@ -74,6 +74,7 @@ import { notificationsMaker } from "./caps/user-notifications";
         makeUICap,
         makeMediaDevicesCAP: undefined,
         makeConnectivity,
+  			makeNetworks: () => networks,
         shell: {
           makeClipboardCAP: undefined,
           makeOpenFileCAP: undefined,

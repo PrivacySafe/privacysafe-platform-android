@@ -27,6 +27,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.Serializable
+import okhttp3.Response
 import java.io.FileNotFoundException
 import java.io.InputStream
 import java.util.Objects
@@ -212,7 +213,39 @@ class CallsIntoCore (
 
 	@Serializable
 	data class NotificationId(val id: Int)
+
+	private fun absorbWebSocketEvent(event: WebSocketEvent) {
+		callReturningVoid("absorbWebSocketEvent", event)
+	}
+
+	@Serializable
+	data class WebSocketEvent(
+		val socketId: Int, val event: String, val msg: String?, val code: Int?, val reason: String?
+	)
+
+	fun passMsgInWebSocket(socketId: Int, msg: String) {
+		absorbWebSocketEvent(WebSocketEvent(socketId, WS_MSG_EVENT, msg, null, null))
+	}
+
+	fun pongInWebSocket(socketId: Int) {
+		absorbWebSocketEvent(WebSocketEvent(socketId, PONG_WS_EVENT, null, null, null))
+	}
+
+	fun signalWebSocketClosing(socketId: Int, code: Int, reason: String) {
+		absorbWebSocketEvent(WebSocketEvent(socketId, CLOSED_WS_EVENT, null, code, reason))
+	}
+
+	fun signalWebSocketFailed(socketId: Int, t: Throwable, response: Response?) {
+		val reason = response?.message ?: t.message ?: t.stackTrace.joinToString("\n")
+		absorbWebSocketEvent(WebSocketEvent(socketId, FAILED_WS_EVENT, null, 4500, reason))
+	}
+
 }
+
+private const val WS_MSG_EVENT = "msg"
+private const val PONG_WS_EVENT = "pong"
+private const val CLOSED_WS_EVENT = "closed"
+private const val FAILED_WS_EVENT = "failed"
 
 private const val BUFFER_SIZE_TO_READ_CODE = 128*1024
 

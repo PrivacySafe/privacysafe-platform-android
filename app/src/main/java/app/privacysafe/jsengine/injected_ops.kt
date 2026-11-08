@@ -62,7 +62,8 @@ import app.privacysafe.jsengine.ops.DisconnectFromCore
 import app.privacysafe.jsengine.ops.OpenWebSocketFn
 import app.privacysafe.jsengine.ops.RandomFn
 import app.privacysafe.jsengine.ops.RequestFn
-import app.privacysafe.jsengine.ops.WebSockets
+import app.privacysafe.WebSockets
+import app.privacysafe.jsengine.ops.CallWebSocketFn
 import app.privacysafe.jsengine.ops.nacl.NaclSBoxOpenOp
 import app.privacysafe.jsengine.ops.nacl.NaclSBoxPackOp
 import java.nio.file.Path
@@ -76,10 +77,11 @@ private fun makeCommonInjectedFns(): Array<InjectedFn> {
 }
 
 fun makeCoreInjectedFns(
-	fns: FnsForCoreInJS, basePath: Path, assets: AssetManager, cryptoExec: Executor, notifications: Notifications
+	fns: FnsForCoreInJS, coreFns: () -> CallsIntoCore, basePath: Path, assets: AssetManager, cryptoExec: Executor,
+																 notifications: Notifications
 ): Array<InjectedFn> {
 	val descriptors = FileDescriptors(basePath)
-	val webSockets = WebSockets(fns.makePortForWS)
+	val webSockets = WebSockets(coreFns)
 	return makeCommonInjectedFns() + arrayOf(
 		FsStat(basePath),
 		FsLStat(basePath),
@@ -104,6 +106,7 @@ fun makeCoreInjectedFns(
 		FhWrite(descriptors),
 		RequestFn(),
 		OpenWebSocketFn(webSockets),
+		CallWebSocketFn(webSockets),
 		UIStartAppActivity(fns.startAndroidActivity),
 		UICloseAppActivity(fns.closeActivity),
 		UIFocusAppActivity(fns.focusActivity),

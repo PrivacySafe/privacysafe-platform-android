@@ -37,7 +37,6 @@ import app.privacysafe.jsengine.caps.ScanUrlQR
 import app.privacysafe.jsengine.caps.ShowSystemErrorBoxOp
 import app.privacysafe.jsengine.caps.StartActivityOp
 import app.privacysafe.jsengine.caps.StartJSEngineComponentOp
-import app.privacysafe.jsengine.ops.MakePortForWS
 import app.privacysafe.webview.GetAppResource
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Deferred
@@ -297,10 +296,6 @@ class CoreRunnerService : Service() {
 
 		val startJSEngineComponent: StartJSEngineComponentOp = { connectorId, appDomain, entrypoint ->
 			jsrunner.startDenoComponent(connectorId, appDomain, entrypoint)
-		}
-
-		val makePortForWS: MakePortForWS = { socketId ->
-			jsrunner.makePortForWS(socketId)
 		}
 
 		val openExternal: OpenExternalFn = { url ->

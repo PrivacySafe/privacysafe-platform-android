@@ -33,5 +33,23 @@ message OpenWSArgs {
 
 message WSOpeningReply {
 	required int32 status = 1;
-	required int32 socket_id = 2;
+	optional int32 socket_id = 2;
+}
+
+message CallWSArg {
+	required int32 socket_id = 1;
+	required string cmd = 2;
+	optional string msg = 3;
+}
+
+message CallWSReply {
+	required string status = 1;
+}
+
+message WebSocketEvent {
+	required int32 socket_id = 1;
+	required string event = 2;
+	optional string msg = 3;
+	optional int32 code = 4;
+	optional string reason = 5;
 }

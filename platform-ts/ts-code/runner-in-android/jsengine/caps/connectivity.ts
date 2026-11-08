@@ -16,62 +16,60 @@
 */
 
 import { Core } from "core-3nweb-client-lib";
-import { Subject } from "rxjs";
 import { wrapFnOnAndroidSide } from "../runtime-ipc-via-ports";
 import { ProtoType } from "../../../platform/lib-common/protobuf-msg";
 import { connectivity as pb } from "../../protos/connectivity.proto";
+import { ObserversSet } from "../../../platform/lib-common/observer-utils";
+import { Subscription, merge, interval, map, mergeMap } from "rxjs";
 
 type ConnectivityCAP = web3n.connectivity.Connectivity;
 type OnlineAssesment = web3n.connectivity.OnlineAssesment;
 type ConnectivityEvent = web3n.connectivity.ConnectivityEvent;
-type Observer<T> = web3n.Observer<T>;
+
+const CHECK_INTERVAL_MILLIS = 30*1000;
 
 export function makeConnectivity(connectivityEvents: Promise<Core['connectivityEvents']>): {
   makeCAP: () => { cap: ConnectivityCAP; }; close: () => void;
 } {
-  const events = new Subject<ConnectivityEvent>();
+	const observers = new ObserversSet<ConnectivityEvent>();
+	let checkProc: Subscription|undefined = undefined;
 
-  connectivityEvents.then(srvEvents => {
-    const { inbox$, storage$ } = srvEvents;
-    inbox$.subscribe({
-      next: inboxStatus => events.next({
-        isOnline: !!inboxStatus.ping,
-        wsEvent: inboxStatus
-      })
-    });
-    storage$.subscribe({
-      next: storageStatus => events.next({
-        isOnline: !!storageStatus.ping,
-        wsEvent: storageStatus
-      })
-    });
-  });
+  connectivityEvents.then(({ inbox$, storage$ }) => {
+		checkProc = merge(
+			interval(CHECK_INTERVAL_MILLIS)
+			.pipe(
+				mergeMap(async () => ({
+					isOnline: await boolIsOnline()
+				}))
+			),
+			inbox$
+			.pipe(
+				mergeMap(async ({ service, type, ping, error, slowSocket, socketClosed }) => ({
+					isOnline: await boolIsOnline(),
+					wsEvent: { service, type, ping, error, slowSocket, socketClosed }
+				}))
+			),
+			storage$
+			.pipe(
+				mergeMap(async ({ service, type, ping, error, slowSocket, socketClosed }) => ({
+					isOnline: await boolIsOnline(),
+					wsEvent: { service, type, ping, error, slowSocket, socketClosed }
+				}))
+			)
+    )
+		.subscribe(observers);
+  })
+	.catch(() => {});
 
-  async function isOnline(): Promise<OnlineAssesment> {
-    const { status } = onlineStatusType.unpack(await isOnlineFn());
-    switch (status) {
-      case NETWORK_PRESENT_STATUS: return 'online_80%';
-      case NO_NETWORK_STATUS: return 'offline_99%';
-      default: {
-        console.error(`connectivity_isOnline returns from Android side an unknown status value '${status}'`);
-        return 'offline_99%';
-      }
-    }
-  }
+	function close() {
+		checkProc?.unsubscribe();
+		checkProc = undefined;
+	}
 
-  function watch(obs: Observer<ConnectivityEvent>): (() => void) {
-    const sub = events.asObservable().subscribe(obs);
-    return () => sub.unsubscribe();
-  }
-
-  function makeCAP(): { cap: ConnectivityCAP; } {
-
-    return { cap: { isOnline, watch } };
-  }
-
-  function close() {}
-
-  return { makeCAP, close };
+	return {
+		makeCAP: () => makeConnectivityCAP(observers),
+		close
+	};
 }
 
 const NETWORK_PRESENT_STATUS = 'network-present';
@@ -80,3 +78,35 @@ const NO_NETWORK_STATUS = 'no-network';
 const isOnlineFn = wrapFnOnAndroidSide('connectivity_isOnline');
 interface OnlineStatus { status: string; }
 const onlineStatusType = ProtoType.for<OnlineStatus>(pb.OnlineStatus);
+
+async function isOnline(): Promise<OnlineAssesment> {
+  const { status } = onlineStatusType.unpack(await isOnlineFn());
+  switch (status) {
+    case NETWORK_PRESENT_STATUS: return 'online_80%';
+    case NO_NETWORK_STATUS: return 'offline_99%';
+    default: {
+      console.error(`connectivity_isOnline returns from Android side an unknown status value '${status}'`);
+      return 'offline_99%';
+    }
+  }
+}
+
+async function boolIsOnline(): Promise<boolean> {
+  const status = await isOnline();
+  return (status === 'online_80%');
+}
+
+function makeConnectivityCAP(observers: ObserversSet<ConnectivityEvent>): { cap: ConnectivityCAP; } {
+
+	function watch(obs: web3n.Observer<ConnectivityEvent>): () => void {
+		observers.add(obs);
+		return () => observers.delete(obs);
+	}
+
+	return {
+		cap: {
+			isOnline,
+			watch
+		}
+	};
+}

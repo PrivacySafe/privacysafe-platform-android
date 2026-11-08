@@ -34,7 +34,6 @@ import app.privacysafe.utils.execBlocking
 import app.privacysafe.jsengine.caps.StartJSEngineComponentOp
 import app.privacysafe.jsengine.ops.DisconnectFromCoreOp
 import app.privacysafe.jsengine.ops.ListCoreObjPathOp
-import app.privacysafe.jsengine.ops.MakePortForWS
 import app.privacysafe.utils.readToString
 import app.privacysafe.webview.GetAppResource
 import app.privacysafe.webview.setup3NWeb
@@ -92,7 +91,7 @@ class JSRunner(
 				core = CoreRunner(
 					makeAndConfigureNewIsolate(jsHas), jsHas,
 					makeCoreInjectedFns(
-						uiFns, Path(dataDir), assets,
+						uiFns, { core.coreFns }, Path(dataDir), assets,
 						Executors.newFixedThreadPool(NUM_OF_CRYPTOR_THREADS),
 						notifications
 					),
@@ -137,8 +136,6 @@ class JSRunner(
 	fun readBytesFromAppCodeFS(connectorId: String, path: String): InputStream {
 		return core.coreFns.streamBytesFromAppCodeFS(connectorId, path)
 	}
-
-	val makePortForWS: MakePortForWS get() = core.makePortForWS
 
 	fun makeAppGUIComponent(connectorId: String, appDomain: String, entrypoint: String) {
 		components.makeAppGUIComponent(connectorId, appDomain, entrypoint)

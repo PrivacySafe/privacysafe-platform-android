@@ -17,16 +17,19 @@
 
 import type { RequestFn, Reply, RequestOpts, Headers, ContentType, NetClient, OpenServiceEventsSource, ServiceEventsSource, ConnectionStatus } from "core-3nweb-client-lib/build/lib-client/request-utils";
 import type { Envelope } from "core-3nweb-client-lib/build/lib-common/ipc/generic-ipc";
-import { openBinaryMsgPort, stringToUtf8Bytes, utf8StringFromBytes, wrapFnOnAndroidSide } from "../runtime-ipc-via-ports";
-import { Subject } from "rxjs";
+import { fnsForAndroid, openBinaryMsgPort, utf8StringFromBytes, wrapFnOnAndroidSide } from "../runtime-ipc-via-ports";
+import { share, Subject } from "rxjs";
 import { request_op as pb } from "../../protos/request.proto";
 import { ProtoType } from "../../../platform/lib-common/protobuf-msg";
 import type { OutgoingHttpHeaders } from "http";
+import { makeConnectionException } from "../../../platform/lib-common/exceptions/http";
+import { makeRuntimeException } from "../../../platform/lib-common/exceptions/runtime";
 
 export function makeRequestFromAndroid(): {
   requestFromAndroid: RequestFn<unknown>;
   openServiceEventsSource: NetClient['openEventSource']
 } {
+  exposeWSEventSinkIfNeeded();
   return { requestFromAndroid, openServiceEventsSource };
 }
 
@@ -134,7 +137,10 @@ async function requestFromAndroid<T>(
   opts: RequestOpts, reqContentType?: ContentType, reqBody?: Uint8Array
 ): Promise<Reply<T>> {
   return unpackReplyPB(
-    await requestFn(packRequest(opts, reqContentType, reqBody)),
+    await requestFn(packRequest(opts, reqContentType, reqBody))
+    .catch(err => {
+      throw makeConnectionException(opts.url, `Error in making a request`, err);
+    }),
     opts
   );
 }
@@ -150,49 +156,201 @@ function makeHeaders(headers: { [h:string]: string; }): Headers {
 const wsOpenFn = wrapFnOnAndroidSide('ws_open');
 interface OpenWSArgs { url: string; sessionId: string; }
 const openWSArgsType = ProtoType.for<OpenWSArgs>(pb.OpenWSArgs);
-interface WSOpeningReply { status: number; socketId: number; }
+interface WSOpeningReply { status: number; socketId?: number; }
 const wsOpeningReplyType = ProtoType.for<WSOpeningReply>(pb.WSOpeningReply);
 
-async function openServiceEventsSource(req: RequestOpts): ReturnType<OpenServiceEventsSource> {
-  const { status, socketId } = wsOpeningReplyType.unpack(
-    await wsOpenFn(openWSArgsType.pack({ url: req.url!, sessionId: req.sessionId! }))
+async function openWSOnAndroidSide(url: string, sessionId: string): Promise<{ status: number; socketId?: number; }> {
+  const reply = await wsOpenFn(openWSArgsType.pack({ url, sessionId }))
+  .catch(err => {
+    throw makeConnectionException(url, `Error in making a request to open WebSocket`, err);
+  });
+  return wsOpeningReplyType.unpack(reply);
+}
+
+const wsCallFn = wrapFnOnAndroidSide('ws_call');
+interface CallWSArg { socketId: number, cmd: 'msg'|'close'|'ping'; msg?: string; }
+const wsCallType = ProtoType.for<CallWSArg>(pb.CallWSArg);
+interface CallWSReply { status: 'ok'|'ws-not-found' };
+const wsCallReplyType = ProtoType.for<CallWSReply>(pb.CallWSReply);
+
+async function callWSOnAndroidSide(socketId: number, cmd: CallWSArg['cmd'], msg?: string) {
+  try {
+    const reply = await wsCallFn(wsCallType.pack({ socketId, cmd, msg }));
+    const { status } = wsCallReplyType.unpack(reply);
+    return (status === 'ok');
+  } catch (err) {
+    console.error(`WTF`, err);
+    throw err;
+  }
+}
+
+interface WebSocketEvent {
+  socketId: number; event: 'msg'|'closed'|'failed'|'pong'; msg?: string; code?: number; reason?: string;
+}
+
+type WSEventSink = {
+  msgs: Subject<Envelope>;
+  close: () => void;
+} & Pick<ReturnType<typeof makeHeartbeat>, 'healthyBeat' | 'otherBeat'>;
+
+const sinksForEventsFromWSOnAndroid = new Map<number, WSEventSink>();
+
+async function absorbWebSocketEvent({ socketId, event, msg, code, reason }: WebSocketEvent): Promise<void> {
+  const sink = sinksForEventsFromWSOnAndroid.get(socketId);
+  if (!sink) {
+    return;
+  }
+  const { msgs, healthyBeat, otherBeat, close } = sink;
+  try {
+    if (event === 'msg') {
+      msgs.next(JSON.parse(msg!));
+      healthyBeat();
+    } else if (event === 'pong') {
+      healthyBeat();
+    } else if (event === 'closed') {
+      otherBeat('disconnected', { socketClosed: true }, true);
+      msgs.error(makeWSException({
+        socketClosed: true,
+      }));
+      close();
+    } else if (event === 'failed') {
+      if (code === 1000) {
+        otherBeat('disconnected', { socketClosed: true }, true);
+        msgs.error(makeWSException({
+          socketClosed: true,
+        }));
+        close();
+      } else {
+        const cause = { error: { code, reason }, socketClosed: true as true };
+        otherBeat('disconnected', cause, true);
+        msgs.error(makeWSException({
+          socketClosed: true,
+          cause
+        }));
+        close();
+      }
+    }
+  } catch (err) {
+    otherBeat('disconnected', { error: err, socketClosed: true }, true);
+    msgs.error(makeWSException({ cause: err }));
+    close();
+  }
+}
+
+let isSinkForWSEventsFromAndroidExposed = false;
+function exposeWSEventSinkIfNeeded() {
+  if (isSinkForWSEventsFromAndroidExposed) {
+    return;
+  }
+  fnsForAndroid.exposeFn(
+    absorbWebSocketEvent,
+    ProtoType.for<WebSocketEvent>(pb.WebSocketEvent),
+    undefined
   );
+  isSinkForWSEventsFromAndroidExposed = true;
+}
+
+async function openServiceEventsSource(req: RequestOpts): ReturnType<OpenServiceEventsSource> {
+  const { status, socketId } = await openWSOnAndroidSide(req.url!, req.sessionId!);
   if (status !== 200) {
     return { status, data: undefined as any };
+  } else if (!socketId) {
+    throw new Error(`Missing socket id, while status is 200`);
   }
 
-  const msgs = new Subject<Envelope>();
-  const heartbeats = new Subject<ConnectionStatus>();
+  // Note: OkHttp (on Android side) is sending own ping requests, closing connection and notifying only
+  //       when pongs ain't coming back from server. So, we ask/ping Android side, if socket is open, and it
+  //       works around OkHttp api shape.
 
-  const port = await openBinaryMsgPort(`ws_#${socketId}`, msg => {
+  function pingWSOnAndroid() {
     try {
-      msgs.next(JSON.parse(utf8StringFromBytes(msg)));
+      callWSOnAndroidSide(socketId!, 'ping');
     } catch (err) {
-      console.error(err);
+      msgs.error(makeWSException({
+        socketClosed: true,
+        cause: err
+      }));
+      otherBeat('disconnected', { error: err }, true);
+      close();
     }
-  });
+  }
 
+  function close() {
+    sinksForEventsFromWSOnAndroid.delete(socketId!);
+    clearInterval(pingRepeat);
+    callWSOnAndroidSide(socketId!, 'close');
+  }
+
+  const pingRepeat = setInterval(pingWSOnAndroid, 10000);
+
+  const msgs = new Subject<Envelope>();
+	const { heartbeat, healthyBeat, otherBeat } = makeHeartbeat(req.url!);
+  sinksForEventsFromWSOnAndroid.set(socketId, { msgs, healthyBeat, otherBeat, close });
   const srvEvents: ServiceEventsSource = {
 
     comm: {
-      postMessage: m => port.send(stringToUtf8Bytes(JSON.stringify(m))),
+      postMessage: m => {
+        callWSOnAndroidSide(socketId, 'msg', JSON.stringify(m));
+      },
       subscribe: obs => {
         const sub = msgs.subscribe(obs);
         return () => {
           sub.unsubscribe();
-          port.close();
+          close();
         };
       }
     },
 
     watch: obs => {
-      const sub = heartbeats.subscribe(obs);
-      return () => {
-        sub.unsubscribe();
-      };
+      const sub = heartbeat.subscribe(obs);
+      return () => sub.unsubscribe();
     }
 
   };
 
   return { status, data: srvEvents };
+}
+
+export interface WSException extends web3n.RuntimeException {
+	type: 'websocket',
+	socketSlow?: true,
+	socketClosed?: true
+}
+
+export function makeWSException(params: Partial<WSException>, flags?: Partial<WSException>): WSException {
+	return makeRuntimeException('websocket', params, flags ?? {});
+}
+
+function makeHeartbeat(url: string) {
+
+	const status = new Subject<ConnectionStatus>();
+
+	let lastInfo = Date.now();
+
+	function healthyBeat(): void {
+		const now = Date.now();
+		status.next({
+			type: 'heartbeat',
+			url,
+			ping: now - lastInfo
+		});
+		lastInfo = now;
+	}
+
+	function otherBeat(type: ConnectionStatus['type'], params: Partial<ConnectionStatus>, end = false): void {
+		status.next({
+			type,
+			url,
+			...params				
+		});
+		if (end) {
+			status.complete();
+		}
+	}
+
+	return {
+		heartbeat: status.asObservable().pipe(share()),
+		healthyBeat,
+		otherBeat
+	};
 }

@@ -34,7 +34,10 @@ import app.privacysafe.utils.execBlocking
 import app.privacysafe.jsengine.caps.StartJSEngineComponentOp
 import app.privacysafe.jsengine.ops.DisconnectFromCoreOp
 import app.privacysafe.jsengine.ops.ListCoreObjPathOp
+import app.privacysafe.utils.appDataDir
+import app.privacysafe.utils.migrateDataIfAnyOldPresent
 import app.privacysafe.utils.readToString
+import app.privacysafe.utils.utilAndroidDir
 import app.privacysafe.webview.GetAppResource
 import app.privacysafe.webview.setup3NWeb
 import kotlinx.coroutines.CompletableDeferred
@@ -48,7 +51,7 @@ import java.util.concurrent.ThreadPoolExecutor
 import java.util.concurrent.atomic.AtomicBoolean
 import kotlin.io.path.Path
 
-const val NUM_OF_CRYPTOR_THREADS = 4
+private const val NUM_OF_CRYPTOR_THREADS = 4
 
 @SuppressLint("RequiresFeature")
 class JSRunner(
@@ -75,6 +78,7 @@ class JSRunner(
 	private val components = Components()
 
 	init {
+		ctx.migrateDataIfAnyOldPresent()
 
 		executor.execute {
 			try {
@@ -87,20 +91,21 @@ class JSRunner(
 					jsBox.isFeatureSupported(JS_FEATURE_ISOLATE_TERMINATION)
 				)
 				Log.d("w3n", "jsHas is $jsHas")
-				val dataDir = ctx.dataDir.absolutePath
+				val appDataDir = ctx.appDataDir()
 				core = CoreRunner(
 					makeAndConfigureNewIsolate(jsHas), jsHas,
 					makeCoreInjectedFns(
-						uiFns, { core.coreFns }, Path(dataDir), assets,
+						uiFns, { core.coreFns }, Path(appDataDir), assets,
 						Executors.newFixedThreadPool(NUM_OF_CRYPTOR_THREADS),
 						notifications
 					),
-					assets, executor, scope, dataDir
+					assets, executor, scope, appDataDir, ctx.utilAndroidDir(),
+					ctx.packageManager.getPackageInfo(ctx.packageName, 0).versionName!!
 				)
 				whenCoreSet!!.complete(core)
 				whenCoreSet = null
 			} catch (err: Throwable) {
-				Log.d("w3n", "\n ------------------------- \n JSRunner.runner: \n${err.stackTraceToString()}")
+				Log.e("w3n", "JSRunner.runner initialization error: \n${err.stackTraceToString()}")
 				whenCoreSet?.completeExceptionally(err)
 			}
 		}

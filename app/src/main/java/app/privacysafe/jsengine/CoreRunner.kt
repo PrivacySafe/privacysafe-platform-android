@@ -22,6 +22,7 @@ import android.util.Log
 import androidx.javascriptengine.JavaScriptConsoleCallback.ConsoleMessage
 import androidx.javascriptengine.JavaScriptIsolate
 import androidx.javascriptengine.TerminationInfo
+import app.privacysafe.utils.appDataDir
 import app.privacysafe.utils.execBlocking
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -41,7 +42,9 @@ class CoreRunner(
 	assets: AssetManager,
 	executor: ThreadPoolExecutor,
 	scope: CoroutineScope,
-	dataDir: String
+	appDataDir: String,
+	utilAndroidDir: String,
+	androidAppVersion: String
 ) : IpcIntoJSEngine(js, jsHas, executor, scope, assets) {
 
 	val coreFns = CallsIntoCore() { portName, listener ->
@@ -51,7 +54,7 @@ class CoreRunner(
 	init {
 		injectFns(*injectedFns)
 		js.loadFrom(assets, Bundled.Path.coreLoad)
-		coreFns.init(dataDir)
+		coreFns.init(appDataDir, utilAndroidDir, androidAppVersion)
 	}
 
 	override fun onConsoleLogMsg(msg: ConsoleMessage) {
@@ -89,12 +92,12 @@ class CallsIntoCore (
 ) : CallsIntoJS(makeMsgPassingPort) {
 	private val ioScope = CoroutineScope(Dispatchers.IO)
 
-	fun init(dataDir: String) {
-		callReturningVoid("init", DataDirArgs(dataDir))
+	fun init(dataDir: String, utilAndroidDir: String, platformVersion: String) {
+		callReturningVoid("init", DataDirArgs(dataDir, utilAndroidDir, platformVersion))
 	}
 
 	@Serializable
-	data class DataDirArgs(val dataDir: String)
+	data class DataDirArgs(val dataDir: String, val utilAndroidDir: String, val platformVersion: String)
 
 	fun attachComponentPortToConnector(connectorId: String) {
 		callReturningVoid("attachComponentPortToConnector", ConnectorIdArgs(connectorId))

@@ -27,7 +27,7 @@ import { defer, Deferred } from "../platform/lib-common/processes/deferred";
 import { StartupAppInAndroid } from "./app-n-components/startup-app";
 import { ComponentForAndroidAccess, ConnectorsAndComponents } from "./app-n-components/connectors-on-core-side";
 import { getCurrentVersion } from "./jsengine/caps/platform";
-import { exitAll, showSystemErrorBox } from "./jsengine/ops/android-activities";
+import { exitAll } from "./jsengine/ops/android-activities";
 import { STARTUP_APP_DOMAIN } from "./jsengine/confs";
 import { lookForAutologinUsers, saveUserKeyForAutologin } from "./jsengine/caps/user-login";
 import { Logging } from "../platform/inject-defs/confs";
@@ -62,6 +62,8 @@ export class InitProc {
     private readonly conf: CoreConf,
 		private readonly r: PlatformResources,
     private readonly utilDir: string,
+    private readonly utilAndroidDir: string,
+    private readonly platformVersion: string,
     private readonly logging: Logging
   ) {}
 
@@ -136,7 +138,7 @@ export class InitProc {
         await saveUserKeyForAutologin({
           key: keyForAutologin,
           userId: toCanonicalAddress(this.userApps!.userId)
-        }, this.utilDir, this.logging.logError);
+        }, this.utilAndroidDir, this.logging.logError);
       }
     }).catch(err => {
       this.userApps = undefined;
@@ -160,7 +162,7 @@ export class InitProc {
     if (!this.r.makeUserLogin) {
       return false;
     }
-    const foundUsers = await lookForAutologinUsers(this.utilDir, this.logging.logError);
+    const foundUsers = await lookForAutologinUsers(this.utilAndroidDir, this.logging.logError);
     if (!foundUsers) {
       return false;
     }
@@ -248,7 +250,7 @@ export class InitProc {
   }
 
 	private readonly platformCAP: web3n.system.platform.Platform = {
-		getCurrentVersion,
+		getCurrentVersion: () => getCurrentVersion(this.platformVersion),
 		wipeFromThisDevice: stub('platformCAP.wipeFromThisDevice for w3n.system.platform capability'),
 	};
 

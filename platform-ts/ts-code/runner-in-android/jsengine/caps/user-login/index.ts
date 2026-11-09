@@ -46,7 +46,7 @@ const AUTOLOGIN_FNAME = 'autologin.json';
 export class UserLogin implements UserLoginType {
 
 	private constructor(
-		private readonly utilDir: string,
+		private readonly utilAndroidDir: string,
 		private readonly logError: LogError,
 		private readonly userId: string,
 		private readonly getKeyFromPass: (pass: string, progressCB: ProgressCB) => Promise<Uint8Array|undefined>
@@ -55,27 +55,27 @@ export class UserLogin implements UserLoginType {
 	}
 
 	static make(
-		utilDir: string, logError: LogError,
+		utilAndroidDir: string, logError: LogError,
 		userId: string,
 		getKeyFromPass: (pass: string, progressCB: ProgressCB) => Promise<Uint8Array|undefined>
 	): UserLoginType {
-		return (new UserLogin(utilDir, logError, userId, getKeyFromPass)).wrapCAP();
+		return (new UserLogin(utilAndroidDir, logError, userId, getKeyFromPass)).wrapCAP();
 	}
 
 	async isAutoLoginSet(): Promise<boolean> {
 		if (!this.isAutoLoginAvailable()) {
 			return false;
 		}
-		const setUsers = await lookForAutologinUsers(this.utilDir, this.logError);
+		const setUsers = await lookForAutologinUsers(this.utilAndroidDir, this.logError);
 		return !!setUsers?.find(({ userId }) => areAddressesEqual(userId, this.userId))
 	}
 
 	async removeAutoLogin(): Promise<void> {
-		const existing = await lookForAutologinUsers(this.utilDir, this.logError);
+		const existing = await lookForAutologinUsers(this.utilAndroidDir, this.logError);
 		if (!existing) {
 			return;
 		}
-		const filePath = join(this.utilDir, AUTOLOGIN_FNAME);
+		const filePath = join(this.utilAndroidDir, AUTOLOGIN_FNAME);
 		const ind = existing.findIndex(creds => areAddressesEqual(creds.userId, this.userId));
 		if (ind < 0) {
 			return;
@@ -84,7 +84,7 @@ export class UserLogin implements UserLoginType {
 			await unlink(filePath).catch(noop);
 		} else {
 			existing.splice(ind, 1);
-			await saveAutologinData(existing, this.utilDir);
+			await saveAutologinData(existing, this.utilAndroidDir);
 		}
 	}
 
@@ -99,7 +99,7 @@ export class UserLogin implements UserLoginType {
 		await saveUserKeyForAutologin({
 			userId: this.userId,
 			key
-		}, this.utilDir, this.logError);
+		}, this.utilAndroidDir, this.logError);
 	}
 
 	async isAutoLoginAvailable(): Promise<boolean> {
@@ -120,8 +120,8 @@ Object.freeze(UserLogin.prototype);
 Object.freeze(UserLogin);
 
 
-export async function saveUserKeyForAutologin(userKey: UserKey, utilDir: string, logError: LogError): Promise<void> {
-	const existing = await lookForAutologinUsers(utilDir, logError);
+export async function saveUserKeyForAutologin(userKey: UserKey, utilAndroidDir: string, logError: LogError): Promise<void> {
+	const existing = await lookForAutologinUsers(utilAndroidDir, logError);
 	if (existing) {
 		const ind = existing.findIndex(creds => areAddressesEqual(creds.userId, userKey.userId));
 		if (ind < 0) {
@@ -129,25 +129,27 @@ export async function saveUserKeyForAutologin(userKey: UserKey, utilDir: string,
 		} else {
 			existing[ind] = userKey;
 		}
-		await saveAutologinData(existing, utilDir);
+		await saveAutologinData(existing, utilAndroidDir);
 	} else {
-		await saveAutologinData([ userKey ], utilDir);
+		await saveAutologinData([ userKey ], utilAndroidDir);
 	}
 }
 
-async function saveAutologinData(data: UserKey[], utilDir: string): Promise<void> {
+async function saveAutologinData(data: UserKey[], utilAndroidDir: string): Promise<void> {
 	const str = JSON.stringify(await Promise.all(data.map(
 		async ({ userId, key }) => ({
 			userId,
 			packedKey: await packKeyWithSafeStorage(key)
 		} as UserKeyJSON)
 	)), null, 2);
-	const filePath = join(utilDir, AUTOLOGIN_FNAME);
+	const filePath = join(utilAndroidDir, AUTOLOGIN_FNAME);
 	await writeFile(filePath, str);
 }
 
-export async function lookForAutologinUsers(utilDir: string, logError: LogError): Promise<UserKey[]|undefined> {
-	const filePath = join(utilDir, AUTOLOGIN_FNAME);
+export async function lookForAutologinUsers(
+	utilAndroidDir: string, logError: LogError
+): Promise<UserKey[]|undefined> {
+	const filePath = join(utilAndroidDir, AUTOLOGIN_FNAME);
 	try {
 		const fileContent = await readFile(filePath, { encoding: 'utf8' });
 		const users = await parseAndCheckCredentials(fileContent);

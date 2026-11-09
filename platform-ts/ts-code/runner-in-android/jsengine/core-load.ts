@@ -54,7 +54,7 @@ import { notificationsMaker } from "./caps/user-notifications";
     return (hashing.sha512.hash(bytes) as any).toBase64();
   }
 
-  function makePlatformResources(utilDir: string, logging: Logging): PlatformResources {
+  function makePlatformResources(utilAndroidDir: string, logging: Logging): PlatformResources {
 
     const { makeNetClient, makeServiceLocator, networks } = makeNetworksParts();
 
@@ -93,7 +93,7 @@ import { notificationsMaker } from "./caps/user-notifications";
       makeNetClient,
       makeServiceLocator,
       makeUserLogin: (userId, getKeyFromPass) => UserLogin.make(
-        utilDir, logging.logError, userId, getKeyFromPass
+        utilAndroidDir, logging.logError, userId, getKeyFromPass
       ),
       showSystemErrorBox,
       getServiceForCAP: undefined,
@@ -106,7 +106,7 @@ import { notificationsMaker } from "./caps/user-notifications";
    * This triggers init process, and can be called only once.
    * dataDir in args is a data directory, like used on all other OS's.
    */
-  async function init({ dataDir }: DataDirArgs) {
+  async function init({ dataDir, utilAndroidDir, platformVersion }: DataDirArgs) {
     fnsForAndroid.removeFn(init);
 
     const utilDir = appDirs(dataDir).getUtilFS();
@@ -121,15 +121,17 @@ import { notificationsMaker } from "./caps/user-notifications";
         dataDir,
         signUpUrl: SIGNUP_URL
       },
-      makePlatformResources(utilDir, logging),
+      makePlatformResources(utilAndroidDir, logging),
       utilDir,
+      utilAndroidDir,
+      platformVersion,
       logging
     );
 
     exposeInitProcFns(initProc);
 
   }
-  interface DataDirArgs { dataDir: string; }
+  interface DataDirArgs { dataDir: string; utilAndroidDir: string; platformVersion: string; }
   fnsForAndroid.exposeFn(
     init,
     ProtoType.for<DataDirArgs>(pb.DataDirArgs),

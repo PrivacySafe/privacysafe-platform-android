@@ -20,7 +20,7 @@ import { listBundledAppPacks, listInstalledBundledApps } from "./system-places";
 
 type BundleVersions = web3n.system.platform.BundleVersions;
 
-export async function getCurrentVersion(): Promise<BundleVersions> {
+export async function getCurrentVersion(platformVersion: string): Promise<BundleVersions> {
 	const bundledApps: BundleVersions['apps'] = {};
 	for (const { id, version } of await listInstalledBundledApps()) {
 		bundledApps[id] = version;
@@ -32,8 +32,8 @@ export async function getCurrentVersion(): Promise<BundleVersions> {
 	return {
 		apps: bundledApps,
 		"app-packs": bundledAppPacks,
-		bundle: `0.1.0+1`, // bundleVersion,
-		platform: `0.1.0`, // bundleVersion.substring(0, bundleVersion.indexOf('+')),
+		bundle: platformVersion,
+		platform: platformVersion.substring(platformVersion.indexOf("_"), platformVersion.lastIndexOf('.')),
 		runtimes: {}
 	};
 }

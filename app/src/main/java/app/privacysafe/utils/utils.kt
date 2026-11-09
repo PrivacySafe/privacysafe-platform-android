@@ -20,7 +20,18 @@ import java.util.concurrent.Executor
 import java.util.concurrent.atomic.AtomicInteger
 import java.util.concurrent.atomic.AtomicLong
 import kotlin.io.encoding.Base64
+import kotlin.io.path.ExperimentalPathApi
+import kotlin.io.path.OnErrorResult
 import kotlin.io.path.Path
+import kotlin.io.path.absolutePathString
+import kotlin.io.path.copyToRecursively
+import kotlin.io.path.deleteIfExists
+import kotlin.io.path.deleteRecursively
+import kotlin.io.path.isDirectory
+import kotlin.io.path.isRegularFile
+import kotlin.io.path.listDirectoryEntries
+import kotlin.io.path.name
+import kotlin.io.path.readBytes
 
 fun makeSequentialStringIdGenerator(): () -> String {
 	val idCount = AtomicLong(0)
@@ -163,11 +174,59 @@ fun Context.customActionIn(intent: Intent): String? {
 	}
 }
 
+private const val APP_DATA_FOLDER_NAME = ".PrivacySafe"
+
+fun Context.appDataDir(): String {
+	return getExternalFilesDir(APP_DATA_FOLDER_NAME)!!.absolutePath
+}
+
+@OptIn(ExperimentalPathApi::class)
+fun Context.migrateDataIfAnyOldPresent() {
+	if (Files.isDirectory(Path("${ appDataDir() }/util"))) {
+		return
+	}
+	val oldDataDir = dataDir.absolutePath
+	if (!Files.isDirectory(Path("$oldDataDir/util"))) {
+		return
+	}
+	val toRm = mutableListOf<Path>()
+	val toCopy = Path(oldDataDir).listDirectoryEntries().filter { entry ->
+		entry.isDirectory() && (
+			(entry.name == "util") ||
+			try {
+				val userId = entry.name.decodeBase64().decodeToString()
+				userId.contains("@")
+			} catch (_: Throwable) {
+				false
+			}
+		)
+	}
+	for (entry in toCopy) {
+		if (entry.name == "util") {
+			val autologinPath = Path("$oldDataDir/util/autologin.json")
+			if (autologinPath.isRegularFile()) {
+				val content = autologinPath.readBytes()
+				writeFileIntoAndroidUtil("autologin.json", content)
+				autologinPath.deleteIfExists()
+			}
+		}
+		val dst = Files.createDirectory( Path("${appDataDir()}/${entry.name}"))
+		entry.copyToRecursively(dst, { _, _, _ -> OnErrorResult.SKIP_SUBTREE }, false, true)
+		toRm.add(entry)
+	}
+	for (entry in toRm) {
+		entry.deleteRecursively()
+	}
+}
+
 private const val ANDROID_UTIL_FOLDER = "util-android"
 
+fun Context.utilAndroidDir(): String {
+	return Path("${dataDir.absolutePath}/${ANDROID_UTIL_FOLDER}").absolutePathString()
+}
+
 fun Context.pathInAndroidUtilFolder(pathInUtil: String): Path {
-	val dataDir = dataDir.absolutePath
-	return Path("$dataDir/${ANDROID_UTIL_FOLDER}/${pathInUtil}")
+	return Path("${utilAndroidDir()}/${pathInUtil}")
 }
 
 fun Context.readFileBytesFromAndroidUtil(pathInUtil: String): ByteArray? {

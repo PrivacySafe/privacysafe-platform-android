@@ -4,6 +4,8 @@ package init;
 
 message DataDirArgs {
 	required string data_dir = 1;
+	required string util_android_dir = 2;
+	required string platform_version = 3;
 }
 
 message ConnectorIdArgs {

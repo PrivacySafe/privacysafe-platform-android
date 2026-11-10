@@ -100,3 +100,13 @@ message AssetsFolderListing {
   }
   repeated AssetFolderItem items = 1;
 }
+
+message WriteFileIntoAndroidUtilArgs {
+  required string path = 1;
+  required bytes content = 2;
+}
+
+message FileContentFromAndroidUtil {
+  required bool file_found = 1;
+  optional bytes content = 2;
+}

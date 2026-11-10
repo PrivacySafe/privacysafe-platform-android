@@ -231,7 +231,7 @@ fun Context.pathInAndroidUtilFolder(pathInUtil: String): Path {
 
 fun Context.readFileBytesFromAndroidUtil(pathInUtil: String): ByteArray? {
 	val fPath = pathInAndroidUtilFolder(pathInUtil)
-	return if (Files.exists(fPath)) {
+	return if (Files.isRegularFile(fPath)) {
 		Files.readAllBytes(fPath)
 	} else { null }
 }

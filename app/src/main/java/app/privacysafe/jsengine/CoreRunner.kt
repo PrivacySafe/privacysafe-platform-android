@@ -43,7 +43,6 @@ class CoreRunner(
 	executor: ThreadPoolExecutor,
 	scope: CoroutineScope,
 	appDataDir: String,
-	utilAndroidDir: String,
 	androidAppVersion: String
 ) : IpcIntoJSEngine(js, jsHas, executor, scope, assets) {
 
@@ -54,7 +53,7 @@ class CoreRunner(
 	init {
 		injectFns(*injectedFns)
 		js.loadFrom(assets, Bundled.Path.coreLoad)
-		coreFns.init(appDataDir, utilAndroidDir, androidAppVersion)
+		coreFns.init(appDataDir, androidAppVersion)
 	}
 
 	override fun onConsoleLogMsg(msg: ConsoleMessage) {
@@ -88,12 +87,12 @@ class CallsIntoCore (
 ) : CallsIntoJS(makeMsgPassingPort) {
 	private val ioScope = CoroutineScope(Dispatchers.IO)
 
-	fun init(dataDir: String, utilAndroidDir: String, platformVersion: String) {
-		callReturningVoid("init", DataDirArgs(dataDir, utilAndroidDir, platformVersion))
+	fun init(dataDir: String, platformVersion: String) {
+		callReturningVoid("init", DataDirArgs(dataDir, platformVersion))
 	}
 
 	@Serializable
-	data class DataDirArgs(val dataDir: String, val utilAndroidDir: String, val platformVersion: String)
+	data class DataDirArgs(val dataDir: String, val platformVersion: String)
 
 	fun attachComponentPortToConnector(connectorId: String) {
 		callReturningVoid("attachComponentPortToConnector", ConnectorIdArgs(connectorId))

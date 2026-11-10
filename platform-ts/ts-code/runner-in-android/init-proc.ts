@@ -62,7 +62,6 @@ export class InitProc {
     private readonly conf: CoreConf,
 		private readonly r: PlatformResources,
     private readonly utilDir: string,
-    private readonly utilAndroidDir: string,
     private readonly platformVersion: string,
     private readonly logging: Logging
   ) {}
@@ -138,7 +137,7 @@ export class InitProc {
         await saveUserKeyForAutologin({
           key: keyForAutologin,
           userId: toCanonicalAddress(this.userApps!.userId)
-        }, this.utilAndroidDir, this.logging.logError);
+        }, this.logging.logError);
       }
     }).catch(err => {
       this.userApps = undefined;
@@ -162,7 +161,7 @@ export class InitProc {
     if (!this.r.makeUserLogin) {
       return false;
     }
-    const foundUsers = await lookForAutologinUsers(this.utilAndroidDir, this.logging.logError);
+    const foundUsers = await lookForAutologinUsers(this.logging.logError);
     if (!foundUsers) {
       return false;
     }

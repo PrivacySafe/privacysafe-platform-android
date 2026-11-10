@@ -94,11 +94,11 @@ class JSRunner(
 				core = CoreRunner(
 					makeAndConfigureNewIsolate(jsHas), jsHas,
 					makeCoreInjectedFns(
-						uiFns, { core.coreFns }, Path(appDataDir), assets,
+						uiFns, { core.coreFns }, Path(appDataDir), ctx.utilAndroidDir(), assets,
 						Executors.newFixedThreadPool(NUM_OF_CRYPTOR_THREADS),
 						notifications
 					),
-					assets, executor, scope, appDataDir, ctx.utilAndroidDir(),
+					assets, executor, scope, appDataDir,
 					ctx.packageManager.getPackageInfo(ctx.packageName, 0).versionName!!
 				)
 				whenCoreSet!!.complete(core)

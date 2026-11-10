@@ -17,12 +17,10 @@
 
 import { areAddressesEqual, toCanonicalAddress } from "../../../../platform/lib-common/canonical-address";
 import { UserLogin as UserLoginType } from "../../../../platform/inject-defs/platform";
-import { base64 } from "../../../../platform/lib-common/buffer-utils";
-import type { FileException } from "../../../../platform/lib-common/exceptions/file";
-import { readFile, unlink, writeFile } from "../../../../platform/lib-common/async-fs-node";
-import { join } from "path";
+import { base64, toBuffer } from "../../../../platform/lib-common/buffer-utils";
 import type { Logging } from "../../../../platform/inject-defs/confs";
 import { decryptWithinKeyStore, encryptWithinKeyStore } from "../../ops/keystore";
+import { readAndroidUtilFile, removeInAndroidUtil, writeAndroidUtilFile } from "../../ops/android-util-fs";
 
 type UserLoginSettings = web3n.system.UserLoginSettings;
 type ProgressCB = web3n.startup.ProgressCB;
@@ -46,7 +44,6 @@ const AUTOLOGIN_FNAME = 'autologin.json';
 export class UserLogin implements UserLoginType {
 
 	private constructor(
-		private readonly utilAndroidDir: string,
 		private readonly logError: LogError,
 		private readonly userId: string,
 		private readonly getKeyFromPass: (pass: string, progressCB: ProgressCB) => Promise<Uint8Array|undefined>
@@ -55,36 +52,35 @@ export class UserLogin implements UserLoginType {
 	}
 
 	static make(
-		utilAndroidDir: string, logError: LogError,
+		logError: LogError,
 		userId: string,
 		getKeyFromPass: (pass: string, progressCB: ProgressCB) => Promise<Uint8Array|undefined>
 	): UserLoginType {
-		return (new UserLogin(utilAndroidDir, logError, userId, getKeyFromPass)).wrapCAP();
+		return (new UserLogin(logError, userId, getKeyFromPass)).wrapCAP();
 	}
 
 	async isAutoLoginSet(): Promise<boolean> {
 		if (!this.isAutoLoginAvailable()) {
 			return false;
 		}
-		const setUsers = await lookForAutologinUsers(this.utilAndroidDir, this.logError);
+		const setUsers = await lookForAutologinUsers(this.logError);
 		return !!setUsers?.find(({ userId }) => areAddressesEqual(userId, this.userId))
 	}
 
 	async removeAutoLogin(): Promise<void> {
-		const existing = await lookForAutologinUsers(this.utilAndroidDir, this.logError);
+		const existing = await lookForAutologinUsers(this.logError);
 		if (!existing) {
 			return;
 		}
-		const filePath = join(this.utilAndroidDir, AUTOLOGIN_FNAME);
 		const ind = existing.findIndex(creds => areAddressesEqual(creds.userId, this.userId));
 		if (ind < 0) {
 			return;
 		}
 		if (existing.length === 1) {
-			await unlink(filePath).catch(noop);
+			await removeInAndroidUtil(AUTOLOGIN_FNAME).catch(noop);
 		} else {
 			existing.splice(ind, 1);
-			await saveAutologinData(existing, this.utilAndroidDir);
+			await saveAutologinData(existing);
 		}
 	}
 
@@ -99,7 +95,7 @@ export class UserLogin implements UserLoginType {
 		await saveUserKeyForAutologin({
 			userId: this.userId,
 			key
-		}, this.utilAndroidDir, this.logError);
+		}, this.logError);
 	}
 
 	async isAutoLoginAvailable(): Promise<boolean> {
@@ -120,8 +116,8 @@ Object.freeze(UserLogin.prototype);
 Object.freeze(UserLogin);
 
 
-export async function saveUserKeyForAutologin(userKey: UserKey, utilAndroidDir: string, logError: LogError): Promise<void> {
-	const existing = await lookForAutologinUsers(utilAndroidDir, logError);
+export async function saveUserKeyForAutologin(userKey: UserKey, logError: LogError): Promise<void> {
+	const existing = await lookForAutologinUsers(logError);
 	if (existing) {
 		const ind = existing.findIndex(creds => areAddressesEqual(creds.userId, userKey.userId));
 		if (ind < 0) {
@@ -129,37 +125,32 @@ export async function saveUserKeyForAutologin(userKey: UserKey, utilAndroidDir: 
 		} else {
 			existing[ind] = userKey;
 		}
-		await saveAutologinData(existing, utilAndroidDir);
+		await saveAutologinData(existing);
 	} else {
-		await saveAutologinData([ userKey ], utilAndroidDir);
+		await saveAutologinData([ userKey ]);
 	}
 }
 
-async function saveAutologinData(data: UserKey[], utilAndroidDir: string): Promise<void> {
+async function saveAutologinData(data: UserKey[]): Promise<void> {
 	const str = JSON.stringify(await Promise.all(data.map(
 		async ({ userId, key }) => ({
 			userId,
 			packedKey: await packKeyWithSafeStorage(key)
 		} as UserKeyJSON)
 	)), null, 2);
-	const filePath = join(utilAndroidDir, AUTOLOGIN_FNAME);
-	await writeFile(filePath, str);
+	await writeAndroidUtilFile(AUTOLOGIN_FNAME, Buffer.from(str, 'utf8'));
 }
 
-export async function lookForAutologinUsers(
-	utilAndroidDir: string, logError: LogError
-): Promise<UserKey[]|undefined> {
-	const filePath = join(utilAndroidDir, AUTOLOGIN_FNAME);
+export async function lookForAutologinUsers(logError: LogError): Promise<UserKey[]|undefined> {
 	try {
-		const fileContent = await readFile(filePath, { encoding: 'utf8' });
-		const users = await parseAndCheckCredentials(fileContent);
+		const fileContent = await readAndroidUtilFile(AUTOLOGIN_FNAME);
+		if (!fileContent) {
+			return;
+		}
+		const users = await parseAndCheckCredentials(toBuffer(fileContent).toString('utf8'));
 		return ((users.length > 0) ? users : undefined);
 	} catch (exc) {
-		if ((exc as FileException).notFound) {
-			return;
-		} else {
-			await logError(exc, `Failed to read and parse ${AUTOLOGIN_FNAME} file`);
-		}
+		await logError(exc, `Failed to read and parse ${AUTOLOGIN_FNAME} file`);
 	}
 }
 

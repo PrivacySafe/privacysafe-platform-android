@@ -63,6 +63,7 @@ import app.privacysafe.jsengine.ops.OpenWebSocketFn
 import app.privacysafe.jsengine.ops.RandomFn
 import app.privacysafe.jsengine.ops.RequestFn
 import app.privacysafe.WebSockets
+import app.privacysafe.jsengine.caps.JSStopComponentOp
 import app.privacysafe.jsengine.ops.CallWebSocketFn
 import app.privacysafe.jsengine.ops.nacl.NaclSBoxOpenOp
 import app.privacysafe.jsengine.ops.nacl.NaclSBoxPackOp
@@ -113,6 +114,7 @@ fun makeCoreInjectedFns(
 		ShowSystemErrorMsgBox(fns.showSystemErrorBox),
 		ExitAll(fns.exitAll),
 		JSStartComponentOp(fns.startJSEngineComponent),
+		JSStopComponentOp(fns.stopJSEngineComponent),
 		AssetsReadBytes(assets),
 		AssetsListFolder(assets),
 		EncryptWithDeviceKey(),

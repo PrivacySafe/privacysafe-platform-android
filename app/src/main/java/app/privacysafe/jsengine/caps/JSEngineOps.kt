@@ -44,3 +44,21 @@ class JSStartComponentOp (
 	data class ComponentEntrypointArgs(val connectorId: String, val appDomain: String, val entrypoint: String)
 
 }
+
+typealias StopJSEngineComponentOp = (connectorId: String) -> Unit
+
+class JSStopComponentOp (
+	private val fn: StopJSEngineComponentOp
+) : InjectedSyncHandler("js_stopComponent") {
+
+	@OptIn(ExperimentalSerializationApi::class)
+	override fun call(argsBytes: ByteArray): ByteArray? {
+		val (connectorId) = ProtoBuf.decodeFromByteArray<RequestArgs>(argsBytes)
+		fn(connectorId)
+		return null
+	}
+
+	@Serializable
+	data class RequestArgs(val connectorId: String)
+
+}

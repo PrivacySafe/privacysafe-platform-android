@@ -29,3 +29,11 @@ export async function startJSEngineComponent(
   await startJSEngineComponentFn(componentEntrypointArgsType.pack({ connectorId, appDomain, entrypoint }));
 }
 
+const stopJSEngineComponentFn = wrapFnOnAndroidSide('js_stopComponent');
+interface ConnectorIdArgs { connectorId: string; }
+const componentIdArgsType = ProtoType.for<ConnectorIdArgs>(pb.ConnectorIdArgs);
+
+export async function stopJSEngineComponent(connectorId: string): Promise<void> {
+  await stopJSEngineComponentFn(componentIdArgsType.pack({ connectorId }));
+}
+

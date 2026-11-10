@@ -26,6 +26,7 @@ import type { CoreDriver } from "../core";
 import { Logging } from "../inject-defs/confs";
 import { PostponedValuesFixedKeysMap } from "../lib-common/postponed-values-map";
 import type { WrapAppCAPsAndSetup } from "../inject-defs/test-stand";
+import { sleep } from "../lib-common/processes/sleep";
 
 
 type ReadonlyFS = web3n.files.ReadonlyFS;
@@ -380,6 +381,7 @@ export abstract class App {
 				}
 			}
 		}
+		await sleep(500);
 	}
 
 	async exposedFSResource(

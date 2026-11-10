@@ -45,6 +45,7 @@ import kotlinx.coroutines.launch
 import java.io.FileNotFoundException
 import kotlin.system.exitProcess
 import androidx.core.net.toUri
+import app.privacysafe.jsengine.caps.StopJSEngineComponentOp
 import app.privacysafe.utils.Bundled
 import app.privacysafe.utils.Permission
 import app.privacysafe.utils.customActionIn
@@ -296,6 +297,10 @@ class CoreRunnerService : Service() {
 
 		val startJSEngineComponent: StartJSEngineComponentOp = { connectorId, appDomain, entrypoint ->
 			jsrunner.startDenoComponent(connectorId, appDomain, entrypoint)
+		}
+
+		val stopJSEngineComponent: StopJSEngineComponentOp = { connectorId ->
+			jsrunner.stopDenoComponent(connectorId)
 		}
 
 		val openExternal: OpenExternalFn = { url ->

@@ -18,7 +18,7 @@
 import { AppComponentBase } from "../../platform/apps/app";
 import type { AppCAPsAndSetup, Service } from "../../platform/inject-defs/apps";
 import type { PostponedValuesFixedKeysMap } from '../../platform/lib-common/postponed-values-map';
-import { startJSEngineComponent } from "../jsengine/ops/android-jsengine";
+import { startJSEngineComponent, stopJSEngineComponent } from "../jsengine/ops/android-jsengine";
 
 
 export class DenoComponent extends AppComponentBase {
@@ -52,6 +52,7 @@ export class DenoComponent extends AppComponentBase {
 			} catch (_) {}
 		}
 		this.onCloseListeners.splice(0, this.onCloseListeners.length);
+		stopJSEngineComponent(this.connectorId);
 	}
 
 }

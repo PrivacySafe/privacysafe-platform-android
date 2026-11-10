@@ -31,7 +31,6 @@ import androidx.javascriptengine.JavaScriptSandbox.JS_FEATURE_ISOLATE_TERMINATIO
 import app.privacysafe.FnsForCoreInJS
 import app.privacysafe.Notifications
 import app.privacysafe.utils.execBlocking
-import app.privacysafe.jsengine.caps.StartJSEngineComponentOp
 import app.privacysafe.jsengine.ops.DisconnectFromCoreOp
 import app.privacysafe.jsengine.ops.ListCoreObjPathOp
 import app.privacysafe.utils.appDataDir
@@ -289,8 +288,16 @@ class JSRunner(
 
 	}
 
-	val startDenoComponent: StartJSEngineComponentOp = { connectorId, appDomain, entrypoint ->
+	fun startDenoComponent(connectorId: String, appDomain: String, entrypoint: String) {
 		components.makeAndStartAppDenoComponent(connectorId, appDomain, entrypoint)
+	}
+
+	fun stopDenoComponent(connectorId: String) {
+		val c = components.find(connectorId)
+		if (c is AppComponentConnector) {
+			c.disconnectAndStopJSEngine()
+			components.remove(c)
+		}
 	}
 
 	inner class AppComponentConnector (

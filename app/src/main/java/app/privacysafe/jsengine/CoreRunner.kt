@@ -58,31 +58,27 @@ class CoreRunner(
 	}
 
 	override fun onConsoleLogMsg(msg: ConsoleMessage) {
-		Log.i("ps-core", msg.message)
+		Log.i("w3n-core", msg.message)
 	}
 
 	override fun onConsoleInfoMsg(msg: ConsoleMessage) {
-		Log.i("ps-core", msg.message)
+		Log.i("w3n-core", msg.message)
 	}
 
 	override fun onConsoleWarningMsg(msg: ConsoleMessage) {
-		Log.w("ps-core", msg.message)
+		Log.w("w3n-core", msg.message)
 	}
 
 	override fun onConsoleDebugMsg(msg: ConsoleMessage) {
-		Log.i("ps-core", msg.message)
+		Log.i("w3n-core", msg.message)
 	}
 
 	override fun onConsoleErrorMsg(msg: ConsoleMessage) {
-		Log.e("ps-core", msg.message)
+		Log.e("w3n-core", msg.message)
 	}
 
 	override fun onTerminated(info: TerminationInfo) {
-		Log.e("ps-core", "Termination occurred: ${info.message}")
-	}
-
-	val makePortForWS = { socketId: Int ->
-		makePort("ws_#$socketId")
+		Log.e("w3n-core", "Termination occurred: ${info.message}")
 	}
 
 }

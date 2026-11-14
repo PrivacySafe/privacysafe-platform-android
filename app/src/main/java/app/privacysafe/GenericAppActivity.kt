@@ -50,7 +50,7 @@ abstract class GenericAppActivity() : ComponentActivity() {
 
 	protected lateinit var appDomain: String
 	protected lateinit var core: UIComponent
-	protected lateinit var appSrvConn: ServiceConnection
+	protected var disconnectCore: (() -> Unit)? = null
 
 	override fun onCreate(savedInstanceState: Bundle?) {
 		super.onCreate(savedInstanceState)
@@ -61,8 +61,6 @@ abstract class GenericAppActivity() : ComponentActivity() {
 		} else {
 			setInitScreenText("Loading $appDomain ...")
 		}
-		val (conn, coreDef) = bindCoreService(appDomain)
-		appSrvConn = conn
 
 		val permissionRequester = intent.extras!!.getStringArrayList(REQUIRED_PERMISSIONS).let { p ->
 			if (!p.isNullOrEmpty()) { checkMultiplePermissionsAndRegisterRequesterIfNeeded(p) } else { null }
@@ -73,8 +71,9 @@ abstract class GenericAppActivity() : ComponentActivity() {
 				if (permissionRequester != null) {
 					permissionRequester()
 				}
-				val coreSrv = coreDef.await()
-				if (setup(coreSrv)) {
+				val srv = bindCoreService(appDomain)
+				disconnectCore = srv.second
+				if (setup(srv.first)) {
 					core.setActive(true)
 				} else {
 					finishAndRemoveTask()
@@ -136,12 +135,13 @@ abstract class GenericAppActivity() : ComponentActivity() {
 
 		// TODO service method to get dynamically app info from its manifest, name, icon, etc.
 
+		val classOfExistingTask = this::class.java
+
 		core.setUICallbacks(
 			close = { finishAndRemoveTask() },
 			focus = {
 				focus3NWebAppGUIComponent(
-					core.connectorId, core.appDomain, core.entrypoint,
-					this@GenericAppActivity::class.java
+					core.connectorId, core.appDomain, core.entrypoint, classOfExistingTask
 				)
 			}
 		)
@@ -181,8 +181,8 @@ abstract class GenericAppActivity() : ComponentActivity() {
 		if (this::core.isInitialized) {
 			core.disconnect()
 		}
-		if (this::appSrvConn.isInitialized) {
-			unbindService(appSrvConn)
+		if (disconnectCore != null) {
+			disconnectCore!!()
 		}
 		super.onDestroy()
 	}

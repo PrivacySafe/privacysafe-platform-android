@@ -25,19 +25,28 @@ import type { OutgoingHttpHeaders } from "http";
 import { makeConnectionException } from "../../../platform/lib-common/exceptions/http";
 import { makeRuntimeException } from "../../../platform/lib-common/exceptions/runtime";
 
-export function makeRequestFromAndroid(): {
+export function makeRequestFromAndroid(netId: string): {
   requestFromAndroid: RequestFn<unknown>;
   openServiceEventsSource: NetClient['openEventSource']
 } {
   exposeWSEventSinkIfNeeded();
-  return { requestFromAndroid, openServiceEventsSource };
+  return {
+    requestFromAndroid: (
+      opts, reqContentType, reqBody
+    ) => requestFromAndroid(netId, opts, reqContentType, reqBody),
+    openServiceEventsSource: (req) => openServiceEventsSource(netId, req)
+  };
 }
 
 const requestFn = wrapFnOnAndroidSide('http_request');
 
 type HeadersArray = { name: string;  value: string; }[];
 
-interface RequestPB {
+interface RequestArgsPB {
+  netId: string;
+  opts: RequestOptsPB;
+}
+interface RequestOptsPB {
   method: string;
   url: string;
   responseType?: string;
@@ -49,18 +58,21 @@ interface RequestPB {
   contentType?: string;
   body?: Uint8Array;
 }
-const requestPBType = ProtoType.for<RequestPB>(pb.RequestArgs);
+const requestPBType = ProtoType.for<RequestArgsPB>(pb.RequestArgs);
 function packRequest(
+  netId: string,
   {
     method, url, requestHeaders, responseHeaders, responseType, sessionId, timeout, timeoutRetries
   }: RequestOpts, reqContentType: ContentType|undefined, body: Uint8Array|undefined
 ): Buffer {
   return requestPBType.pack({
-    method, sessionId, timeout, timeoutRetries, responseType, responseHeaders,
-    url: url!,
-    requestHeaders: toHeadersArr(requestHeaders),
-    contentType: reqContentType,
-    body: body ?? new Uint8Array(0)
+    netId, opts: {
+      method, sessionId, timeout, timeoutRetries, responseType, responseHeaders,
+      url: url!,
+      requestHeaders: toHeadersArr(requestHeaders),
+      contentType: reqContentType,
+      body: body ?? new Uint8Array(0)
+    }
   });
 }
 
@@ -134,10 +146,10 @@ function unpackReplyPB<T>(
 }
 
 async function requestFromAndroid<T>(
-  opts: RequestOpts, reqContentType?: ContentType, reqBody?: Uint8Array
+  netId: string, opts: RequestOpts, reqContentType?: ContentType, reqBody?: Uint8Array
 ): Promise<Reply<T>> {
   return unpackReplyPB(
-    await requestFn(packRequest(opts, reqContentType, reqBody))
+    await requestFn(packRequest(netId, opts, reqContentType, reqBody))
     .catch(err => {
       throw makeConnectionException(opts.url, `Error in making a request`, err);
     }),
@@ -154,13 +166,13 @@ function makeHeaders(headers: { [h:string]: string; }): Headers {
 }
 
 const wsOpenFn = wrapFnOnAndroidSide('ws_open');
-interface OpenWSArgs { url: string; sessionId: string; }
+interface OpenWSArgs { netId: string; url: string; sessionId: string; }
 const openWSArgsType = ProtoType.for<OpenWSArgs>(pb.OpenWSArgs);
 interface WSOpeningReply { status: number; socketId?: number; }
 const wsOpeningReplyType = ProtoType.for<WSOpeningReply>(pb.WSOpeningReply);
 
-async function openWSOnAndroidSide(url: string, sessionId: string): Promise<{ status: number; socketId?: number; }> {
-  const reply = await wsOpenFn(openWSArgsType.pack({ url, sessionId }))
+async function openWSOnAndroidSide(netId: string, url: string, sessionId: string): Promise<{ status: number; socketId?: number; }> {
+  const reply = await wsOpenFn(openWSArgsType.pack({ netId, url, sessionId }))
   .catch(err => {
     throw makeConnectionException(url, `Error in making a request to open WebSocket`, err);
   });
@@ -250,8 +262,8 @@ function exposeWSEventSinkIfNeeded() {
   isSinkForWSEventsFromAndroidExposed = true;
 }
 
-async function openServiceEventsSource(req: RequestOpts): ReturnType<OpenServiceEventsSource> {
-  const { status, socketId } = await openWSOnAndroidSide(req.url!, req.sessionId!);
+async function openServiceEventsSource(netId: string, req: RequestOpts): ReturnType<OpenServiceEventsSource> {
+  const { status, socketId } = await openWSOnAndroidSide(netId, req.url!, req.sessionId!);
   if (status !== 200) {
     return { status, data: undefined as any };
   } else if (!socketId) {

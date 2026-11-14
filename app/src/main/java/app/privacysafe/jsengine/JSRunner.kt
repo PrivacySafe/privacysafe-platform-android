@@ -30,6 +30,7 @@ import androidx.javascriptengine.JavaScriptSandbox.JS_FEATURE_ISOLATE_MAX_HEAP_S
 import androidx.javascriptengine.JavaScriptSandbox.JS_FEATURE_ISOLATE_TERMINATION
 import app.privacysafe.FnsForCoreInJS
 import app.privacysafe.Notifications
+import app.privacysafe.TorProxy
 import app.privacysafe.utils.execBlocking
 import app.privacysafe.jsengine.ops.DisconnectFromCoreOp
 import app.privacysafe.jsengine.ops.ListCoreObjPathOp
@@ -42,6 +43,7 @@ import app.privacysafe.webview.setup3NWeb
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import java.io.InputStream
 import java.util.concurrent.ConcurrentHashMap
@@ -49,6 +51,7 @@ import java.util.concurrent.Executors
 import java.util.concurrent.ThreadPoolExecutor
 import java.util.concurrent.atomic.AtomicBoolean
 import kotlin.io.path.Path
+import kotlin.time.Duration.Companion.milliseconds
 
 private const val NUM_OF_CRYPTOR_THREADS = 4
 
@@ -76,6 +79,8 @@ class JSRunner(
 
 	private val components = Components()
 
+	private val torProxy = TorProxy(ctx)
+
 	init {
 		ctx.migrateDataIfAnyOldPresent()
 
@@ -94,7 +99,8 @@ class JSRunner(
 				core = CoreRunner(
 					makeAndConfigureNewIsolate(jsHas), jsHas,
 					makeCoreInjectedFns(
-						uiFns, { core.coreFns }, Path(appDataDir), ctx.utilAndroidDir(), assets,
+						uiFns, torProxy, { core.coreFns },
+						Path(appDataDir), ctx.utilAndroidDir(), assets,
 						Executors.newFixedThreadPool(NUM_OF_CRYPTOR_THREADS),
 						notifications
 					),
@@ -120,6 +126,7 @@ class JSRunner(
 
 	fun shutdown() {
 		jsBox.close()
+		torProxy.shutdown()
 		executor.shutdown()
 	}
 
@@ -150,18 +157,22 @@ class JSRunner(
 	}
 
 	fun findAndFocusOpenAppInstance(appDomain: String): Boolean {
-		val connectors = components.findFromApp(appDomain)
-		if (connectors.isNullOrEmpty()) {
-			return false
-		}
+		val connectors = components.findGUIFromApp(appDomain) ?: return false
 		for (c in connectors) {
-			if (c is AppGUIComponentConnector) {
-				Log.d("w3n", "JSRunner.findAndFocusOpenAppInstance ${c.appDomain}, ${c.entrypoint}, ${c.connectorId} ")
-				c.focusActivity()
-				return true
-			}
+			c.focusActivity()
+			return true
 		}
 		return false
+	}
+
+	suspend fun findAndCloseOpenedAppInstances(appDomain: String) {
+		val connectors = components.findGUIFromApp(appDomain) ?: return
+		for (c in connectors) {
+			components.remove(c)
+			c.closeActivity()
+			c.disconnect()
+		}
+		delay(200.milliseconds)
 	}
 
 	suspend fun launchAppFromAndroid(appDomain: String): AppGUIComponent? {
@@ -339,13 +350,13 @@ class JSRunner(
 		private val byIds = ConcurrentHashMap<String, ComponentConnector>()
 
 		fun find(connectorId: String): ComponentConnector? {
-			return byIds.get(connectorId)
+			return byIds[connectorId]
 		}
 
-		fun findFromApp(appDomain: String): List<ComponentConnector>? {
-			val found = mutableListOf<ComponentConnector>()
-			byIds.forEach { _, c ->
-				if (c.appDomain == appDomain) {
+		fun findGUIFromApp(appDomain: String): List<AppGUIComponentConnector>? {
+			val found = mutableListOf<AppGUIComponentConnector>()
+			byIds.forEach { (_, c) ->
+				if ((c.appDomain == appDomain) && (c is AppGUIComponentConnector)) {
 					found.add(c)
 				}
 			}

@@ -17,10 +17,8 @@
 package app.privacysafe
 
 import android.app.Service
-import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
-import android.content.ServiceConnection
 import android.net.ConnectivityManager
 import android.os.Binder
 import android.os.IBinder
@@ -39,7 +37,6 @@ import app.privacysafe.jsengine.caps.StartActivityOp
 import app.privacysafe.jsengine.caps.StartJSEngineComponentOp
 import app.privacysafe.webview.GetAppResource
 import kotlinx.coroutines.CompletableDeferred
-import kotlinx.coroutines.Deferred
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import java.io.FileNotFoundException
@@ -48,6 +45,7 @@ import androidx.core.net.toUri
 import app.privacysafe.jsengine.caps.StopJSEngineComponentOp
 import app.privacysafe.utils.Bundled
 import app.privacysafe.utils.Permission
+import app.privacysafe.utils.connectToService
 import app.privacysafe.utils.customActionIn
 import app.privacysafe.utils.customIntentAction
 import app.privacysafe.utils.getActivityManager
@@ -108,7 +106,7 @@ class CoreRunnerService : Service() {
 
 	private fun removeNotRunningAppTasks() {
 		getActivityManager().appTasks
-			.filter { t -> !t.taskInfo.isRunning }
+			.filter { t -> !(t.taskInfo?.isRunning ?: false) }
 			.forEach { t ->
 				t.finishAndRemoveTask()
 			}
@@ -191,14 +189,15 @@ class CoreRunnerService : Service() {
 			this@CoreRunnerService.openLauncher()
 		}
 
-		fun startLogin(urlToProcess: String?) {
+		suspend fun startLoginOrPassSignupURL(urlToProcess: String?) {
 			val startupUrlHash = if (urlToProcess == null) { null } else {
 				jsrunner.processURLBeforeLogin(urlToProcess)
 			}
+			// focusing of startup app doesn't work, so, we close existing one
+			jsrunner.findAndCloseOpenedAppInstances(Bundled.startupDomain)
 			// this implicitly is a call to core to start login.
 			startStartupApp(startupUrlHash)
 		}
-
 	}
 
 	/**
@@ -429,38 +428,18 @@ const val START_CORE_ON_BOOT_ACTION = "start-core-on-boot"
 fun Context.startCoreRunnerService(action: String) {
 	val intent = Intent(this, CoreRunnerService::class.java)
 		.setAction(customIntentAction(action))
-	this.startForegroundService(intent)
-}
-
-
-private fun <T : Binder> Context.bindCoreService(
-	onDisconnect: ((name: ComponentName?) -> Unit)?,
-	setupIntent: (intent: Intent) -> Unit
-): Pair<ServiceConnection, Deferred<T>> {
-	val deferred = CompletableDeferred<T>()
-	val srvConn = object : ServiceConnection {
-		override fun onServiceConnected(name: ComponentName?, service: IBinder?) {
-			@Suppress("UNCHECKED_CAST")
-			deferred.complete(service as T)
-		}
-		override fun onServiceDisconnected(name: ComponentName?) {
-			if (onDisconnect != null) {
-				onDisconnect(name)
-			}
-		}
-	}
-	val intent = Intent(this, CoreRunnerService::class.java)
-	setupIntent(intent)
-	this.bindService(intent, srvConn, 0)
-	return Pair(srvConn, deferred)
+	startForegroundService(intent)
 }
 
 private const val BIND_FOR_INIT_ACTION = "core-for-init"
 typealias CoreInit = CoreRunnerService.BinderForInit
 
-fun InitActivity.startAndBindCoreService(): Pair<ServiceConnection, Deferred<CoreInit>> {
+suspend fun InitActivity.startAndBindCoreService(): Pair<CoreInit, () -> Unit> {
 	startCoreRunnerService(START_CORE_BY_INIT_ACTION)
-	return bindCoreService({ finishAndRemoveTask() }) { intent ->
+	return connectToService(
+		CoreRunnerService::class.java,
+		{ finishAndRemoveTask() }
+	) { intent ->
 		intent.action = customIntentAction(BIND_FOR_INIT_ACTION)
 	}
 }
@@ -471,8 +450,11 @@ const val APP_DOMAIN = "app-domain"
 typealias BinderFor3NWebApp = CoreRunnerService.BinderFor3NWebApp
 typealias UIComponent = CoreRunnerService.UIComponent
 
-fun GenericAppActivity.bindCoreService(appDomain: String): Pair<ServiceConnection, Deferred<BinderFor3NWebApp>> {
-	return bindCoreService({ finishAndRemoveTask() }) { intent ->
+suspend fun GenericAppActivity.bindCoreService(appDomain: String): Pair<BinderFor3NWebApp, () -> Unit> {
+	return connectToService(
+		CoreRunnerService::class.java,
+		{ finishAndRemoveTask() }
+	) { intent ->
 		intent.setAction(customIntentAction(BIND_FOR_3NWEB_APP_ACTION))
 			.putExtra(APP_DOMAIN, appDomain)
 	}

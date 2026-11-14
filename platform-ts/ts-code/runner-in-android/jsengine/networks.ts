@@ -24,6 +24,11 @@ import { makeRequestFromAndroid } from './ops/request';
 type Networks = web3n.system.networks.Networks;
 type DnsAndIP = web3n.system.networks.DnsAndIP;
 type ProxiesForDnsAndIP = web3n.system.networks.ProxiesForDnsAndIP;
+type Onion = web3n.system.networks.Onion;
+type TorProxySetup = web3n.system.networks.TorProxySetup;
+
+const REGULAR_NET_ID = 'dns+ip';
+const ONION_NET_ID = 'onion';
 
 
 class DnsAndIPNet implements DnsAndIP {
@@ -34,9 +39,16 @@ class DnsAndIPNet implements DnsAndIP {
 	private currentEventsSourceFn: OpenServiceEventsSource;
 	private currentResolvers: DnsResolver[];
 
-	constructor() {
+	constructor(
+		private readonly onionRequestFn: RequestFn<unknown>,
+		private readonly onionEventsSourceFn: OpenServiceEventsSource,
+		initProxySetup?: ProxiesForDnsAndIP
+	) {
 		this.setRegularFns();
 		this.setDnsResolvers();
+		if (initProxySetup) {
+			this.setCurrentProxy(initProxySetup);
+		}
 		Object.seal(this);
 	}
 
@@ -45,13 +57,30 @@ class DnsAndIPNet implements DnsAndIP {
 	}
 
 	private setRegularFns(): void {
-		const { requestFromAndroid, openServiceEventsSource } = makeRequestFromAndroid();
+		const { requestFromAndroid, openServiceEventsSource } = makeRequestFromAndroid(REGULAR_NET_ID);
 		this.currentRequestFn = requestFromAndroid;
 		this.currentEventsSourceFn = openServiceEventsSource;
 	}
 
 	async setCurrentProxy(opts: ProxiesForDnsAndIP|undefined): Promise<void> {
-		throw new Error(`Setting proxy is not implemented on Android, yet`);
+		if (!opts) {
+			this.setRegularFns();
+			this.setDnsResolvers();
+		} else if (opts === 'tor') {
+			this.currentRequestFn = this.onionRequestFn;
+			this.currentEventsSourceFn = this.onionEventsSourceFn;
+			this.setDnsResolvers();
+		} else if (opts.type === 'socks5') {
+			// const agent = new SocksProxyAgent(`socks://${opts.hostname}:${opts.port}`);
+
+			// // XXX testing should happen here
+
+			// this.setRegularFns(agent);
+			// this.setDnsResolvers();
+
+			throw new Error(`Setting up socks proxy is not implented`);
+		}
+		this.proxySetup = opts;
 	}
 
 	private setDnsResolvers(): void {
@@ -90,12 +119,56 @@ Object.freeze(DnsAndIPNet.prototype);
 Object.freeze(DnsAndIPNet);
 
 
+class OnionNet implements Onion {
+
+	private currentRequestFn: RequestFn<unknown>;
+	private currentEventsSourceFn: OpenServiceEventsSource;
+
+	constructor() {
+		this.setCurrentFns();
+		Object.seal(this);
+	}
+
+	private setCurrentFns(): void {
+		const { requestFromAndroid, openServiceEventsSource } = makeRequestFromAndroid(ONION_NET_ID);
+		this.currentRequestFn = requestFromAndroid;
+		this.currentEventsSourceFn = openServiceEventsSource;
+	}
+
+	wrapCAP(): NonNullable<Networks['onion']> {
+		return {
+			testConnection: this.testConnection.bind(this)
+		};
+	}
+
+	async testConnection(opts?: TorProxySetup): Promise<boolean> {
+
+		// XXX testing should happen here
+
+		return true;
+	}
+
+	readonly requests: RequestFn<unknown> = (opts, reqContentType, reqBody) => {
+		return this.currentRequestFn(opts, reqContentType, reqBody);
+	}
+
+	readonly openServiceEventsSource: OpenServiceEventsSource = req => {
+		return this.currentEventsSourceFn(req);
+	}
+
+}
+Object.freeze(OnionNet.prototype);
+Object.freeze(OnionNet);
+
+
 export function makeNetworksParts() {
 
-	const dnsAndIPNet = new DnsAndIPNet();
+	const onionNet = new OnionNet();
+	const dnsAndIPNet = new DnsAndIPNet(onionNet.requests, onionNet.openServiceEventsSource);
 
 	const networks: Networks = {
 		dnsAndIP: dnsAndIPNet.wrapCAP(),
+		onion: onionNet.wrapCAP()
 	};
 
 	const { makeNet: makeNetClient, makeLocator: makeServiceLocator } = wrapNetworkFns({
@@ -103,6 +176,10 @@ export function makeNetworksParts() {
 			requests: dnsAndIPNet.requests,
 			openServiceEventsSource: dnsAndIPNet.openServiceEventsSource,
 			naming: dnsAndIPNet.namingFns
+		},
+		onion: {
+			requests: onionNet.requests,
+			openServiceEventsSource: onionNet.openServiceEventsSource,
 		}
 	});
 

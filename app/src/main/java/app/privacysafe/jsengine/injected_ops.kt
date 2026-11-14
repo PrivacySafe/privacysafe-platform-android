@@ -19,6 +19,7 @@ package app.privacysafe.jsengine
 import android.content.res.AssetManager
 import app.privacysafe.FnsForCoreInJS
 import app.privacysafe.Notifications
+import app.privacysafe.TorProxy
 import app.privacysafe.jsengine.caps.AddNotificationOp
 import app.privacysafe.jsengine.caps.AssetsListFolder
 import app.privacysafe.jsengine.caps.AssetsReadBytes
@@ -62,7 +63,6 @@ import app.privacysafe.jsengine.ops.DisconnectFromCore
 import app.privacysafe.jsengine.ops.OpenWebSocketFn
 import app.privacysafe.jsengine.ops.RandomFn
 import app.privacysafe.jsengine.ops.RequestFn
-import app.privacysafe.WebSockets
 import app.privacysafe.jsengine.caps.JSStopComponentOp
 import app.privacysafe.jsengine.ops.CallWebSocketFn
 import app.privacysafe.jsengine.ops.ReadFromAndroidUtilFsOp
@@ -70,6 +70,7 @@ import app.privacysafe.jsengine.ops.RemoveFromAndroidUtilFsOp
 import app.privacysafe.jsengine.ops.WriteIntoAndroidUtilFsOp
 import app.privacysafe.jsengine.ops.nacl.NaclSBoxOpenOp
 import app.privacysafe.jsengine.ops.nacl.NaclSBoxPackOp
+import app.privacysafe.makeNetworksParts
 import java.nio.file.Path
 import java.util.concurrent.Executor
 
@@ -81,11 +82,11 @@ private fun makeCommonInjectedFns(): Array<InjectedFn> {
 }
 
 fun makeCoreInjectedFns(
-	fns: FnsForCoreInJS, coreFns: () -> CallsIntoCore, basePath: Path, utilAndroidDir: String, assets: AssetManager,
-	cryptoExec: Executor, notifications: Notifications
+	fns: FnsForCoreInJS, torProxy: TorProxy, coreFns: () -> CallsIntoCore, basePath: Path, utilAndroidDir: String,
+	assets: AssetManager, cryptoExec: Executor, notifications: Notifications
 ): Array<InjectedFn> {
 	val descriptors = FileDescriptors(basePath)
-	val webSockets = WebSockets(coreFns)
+	val (getNetClient, webSockets) = makeNetworksParts(torProxy, coreFns)
 	return makeCommonInjectedFns() + arrayOf(
 		FsStat(basePath),
 		FsLStat(basePath),
@@ -111,7 +112,7 @@ fun makeCoreInjectedFns(
 		WriteIntoAndroidUtilFsOp(utilAndroidDir),
 		ReadFromAndroidUtilFsOp(utilAndroidDir),
 		RemoveFromAndroidUtilFsOp(utilAndroidDir),
-		RequestFn(),
+		RequestFn(getNetClient),
 		OpenWebSocketFn(webSockets),
 		CallWebSocketFn(webSockets),
 		UIStartAppActivity(fns.startAndroidActivity),

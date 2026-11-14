@@ -2,11 +2,18 @@ package app.privacysafe.utils
 
 import android.Manifest
 import android.app.ActivityManager
+import android.app.Service
+import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
+import android.content.ServiceConnection
+import android.os.Binder
+import android.os.IBinder
 import android.webkit.PermissionRequest
+import app.privacysafe.CoreRunnerService
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Deferred
 import kotlinx.coroutines.launch
 import kotlinx.serialization.json.Json
 import java.io.BufferedReader
@@ -259,4 +266,29 @@ inline fun <reified T> Context.readJsonFileFromAndroidUtil(pathInUtil: String): 
 inline fun <reified T> Context.writeJsonFileIntoAndroidUtil(pathInUtil: String, json: T) {
 	val txtContent = Json.encodeToString(json)
 	writeFileIntoAndroidUtil(pathInUtil, txtContent.encodeToByteArray())
+}
+
+suspend fun <T : Binder, C : Service> Context.connectToService(
+	srvClass: Class<C>,
+	onDisconnect: ((name: ComponentName?) -> Unit)?,
+	setupIntent: (intent: Intent) -> Unit
+): Pair<T, () -> Unit> {
+	val deferred = CompletableDeferred<T>()
+	val srvConn = object : ServiceConnection {
+		override fun onServiceConnected(name: ComponentName?, service: IBinder?) {
+			@Suppress("UNCHECKED_CAST")
+			deferred.complete(service as T)
+		}
+		override fun onServiceDisconnected(name: ComponentName?) {
+			if (onDisconnect != null) {
+				onDisconnect(name)
+			}
+		}
+	}
+	val intent = Intent(this, srvClass)
+	setupIntent(intent)
+	this.bindService(intent, srvConn, 0)
+	val srv = deferred.await()
+	val disconnect = { this.unbindService(srvConn) }
+	return Pair(srv, disconnect)
 }

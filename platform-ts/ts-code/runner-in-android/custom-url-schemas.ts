@@ -52,7 +52,10 @@ function parseSignupURL(urlStr: string): SignupParamsViaURL|undefined {
 	}
 	const token = urlStr.substring(indOfLastSlash+1);
 	if (urlStr.startsWith(customSignup)) {
-		const signupUrl = (new URL(`https://${urlStr.substring(customSignup.length, indOfLastSlash+1)}`)).href;
+		let signupUrl = (new URL(`https://${urlStr.substring(customSignup.length, indOfLastSlash+1)}`)).href;
+		if ((new URL(signupUrl)).hostname.endsWith('.onion')) {
+    signupUrl = `http${signupUrl.substring(5)}`;
+  }
 		return {
 			signupUrl,
 			token

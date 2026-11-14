@@ -18,7 +18,6 @@ package app.privacysafe
 
 import android.app.NotificationManager
 import android.content.Intent
-import android.content.ServiceConnection
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.javascriptengine.SandboxUnsupportedException
@@ -34,7 +33,7 @@ import kotlinx.coroutines.launch
 class InitActivity : ComponentActivity() {
 
 	private val scope = CoroutineScope(Dispatchers.Main)
-	private lateinit var coreSrvConn: ServiceConnection
+	private var disconnectCore: (() -> Unit)? = null
 
 	private lateinit var notifications: NotificationManager
 
@@ -64,10 +63,10 @@ class InitActivity : ComponentActivity() {
 	}
 
 	private fun startCoreServiceAndForwardToSystemApp() {
-		val (conn, coreDef) = this.startAndBindCoreService()
-		coreSrvConn = conn
 		scope.launch {
-			core = coreDef.await()
+			val srv = startAndBindCoreService()
+			core = srv.first
+			disconnectCore = srv.second
 			ensureJSRunnerRunningOrExitProcess(core)
 			core.setUICallbacks(
 				close = { finish() }
@@ -80,7 +79,7 @@ class InitActivity : ComponentActivity() {
 					core.processURL(urlToProcess)
 				}
 			} else {
-				core.startLogin(urlToProcess)
+				core.startLoginOrPassSignupURL(urlToProcess)
 			}
 			finishAndRemoveTask()
 		}
@@ -108,8 +107,8 @@ class InitActivity : ComponentActivity() {
 	}
 
 	override fun onDestroy() {
-		if (this::coreSrvConn.isInitialized) {
-			unbindService(coreSrvConn)
+		if (disconnectCore != null) {
+			disconnectCore!!()
 		}
 		super.onDestroy()
 	}

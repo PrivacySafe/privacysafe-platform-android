@@ -8,7 +8,11 @@ plugins {
 
 android {
   namespace = "app.privacysafe"
-  compileSdk = 36
+  compileSdk {
+    version = release(37) {
+      minorApiLevel = 2
+    }
+  }
 
   fun readVersionCodeFromFileOr(testVersion: Int): Int {
     val versionCodeFile = "app/version-code"
@@ -30,26 +34,12 @@ android {
     }
   }
 
-//  Making R8 permanent in release
-//  fun enableR8inBuild(): Boolean {
-//    val enableR8NameFile = "app/enable-r8-minifications"
-//    val flag = try {
-//      rootProject.projectDir.toPath().resolve(enableR8NameFile).toFile().readText().trim()
-//    } catch (_: Throwable) {
-//      println("File $enableR8NameFile not found")
-//      return false
-//    }
-//    return (flag == "true")
-//  }
-
   defaultConfig {
     applicationId = "app.privacysafe"
     minSdk = 29
-    targetSdk = 36
+    targetSdk = 37
     versionCode = readVersionCodeFromFileOr(1)
     versionName = readVersionNameFromFileOr("11-11_1.0.0.1")
-
-//    testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
   }
 
   val keyFileName = "release.jks"
@@ -150,6 +140,8 @@ dependencies {
   implementation(libs.kotlinx.serialization.json)
   implementation(libs.kotlinx.serialization.protobuf)
   implementation(libs.okhttp)
+
+  implementation(libs.tor.android)
 
   implementation(libs.journey.zxing.embedded)
   implementation(libs.google.zxing.core)

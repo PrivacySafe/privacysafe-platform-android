@@ -16,127 +16,35 @@
 */
 package app.privacysafe.jsengine.ops
 
-import app.privacysafe.SESSION_ID_HEADER
+import app.privacysafe.GetNetClient
+import app.privacysafe.RequestOpts
 import app.privacysafe.jsengine.InjectedAsyncHandler
 import app.privacysafe.WebSockets
 import app.privacysafe.jsengine.InjectedSyncHandler
-import app.privacysafe.jsengine.ops.RequestFn.Header
-import kotlinx.coroutines.CompletableDeferred
+import app.privacysafe.sendRequest
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.decodeFromByteArray
 import kotlinx.serialization.encodeToByteArray
 import kotlinx.serialization.protobuf.ProtoBuf
-import okhttp3.Call
-import okhttp3.Callback
-import okhttp3.Headers
-import okhttp3.MediaType.Companion.toMediaTypeOrNull
-import okhttp3.OkHttpClient
-import okhttp3.Request
-import okhttp3.RequestBody.Companion.toRequestBody
-import okhttp3.Response
-import okio.IOException
 
 
-class RequestFn : InjectedAsyncHandler(
+class RequestFn(
+	private val getNetClient: GetNetClient
+) : InjectedAsyncHandler(
 	"http_request"
 ) {
 
-	// TODO this is same client for all "net" clients in core, which may leak stuff, and won't work with
-	//      simultaneous connectivity to different networks.
-	//      We also want a concept of netClientId, that gets released when js' side client does its close().
-	//      Methods will also use netClientId.
-	val client = OkHttpClient.Builder().build()
-
 	@OptIn(ExperimentalSerializationApi::class)
 	override suspend fun call(argsBytes: ByteArray): ByteArray {
-		val req = ProtoBuf.decodeFromByteArray<RequestArgs>(argsBytes)
-		val resp = sendRequest(buildRequest(req))
-		return ProtoBuf.encodeToByteArray(Reply(
-			resp.code,
-			resp.headers.filterRequested(req.responseHeaders),
-			resp.body.bytes()
-		))
-	}
-
-	private fun buildRequest(opts: RequestArgs): Request {
-		val (
-			method, url, responseType, sessionId, requestHeaders, responseHeaders, timeout, timeoutRetries,
-			contentType, body
-		) = opts
-		val reqBuilder = Request.Builder()
-			.url(url)
-			.method(
-				method,
-				when (method) {
-					"POST", "PUT" -> body.toRequestBody(contentType?.toMediaTypeOrNull())
-					else -> null
-				}
-			)
-		opts.requestHeaders?.forEach { h ->
-			reqBuilder.addHeader(h.name, h.value)
-		}
-		opts.sessionId?.let {
-			reqBuilder.addHeader(SESSION_ID_HEADER, it)
-		}
-		return reqBuilder.build()
-	}
-
-	private suspend fun sendRequest(req: Request): Response {
-		val resp = CompletableDeferred<Response>()
-		val call = client.newCall(req)
-		call.enqueue(object : Callback {
-			override fun onFailure(call: Call, e: IOException) {
-
-				// XXX we want to map java exceptions into respective connection exception(s) on js side
-
-				resp.completeExceptionally(e)
-			}
-			override fun onResponse(call: Call, response: Response) {
-				resp.complete(response)
-			}
-		})
-		return resp.await()
+		val (netId, opts) = ProtoBuf.decodeFromByteArray<RequestArgs>(argsBytes)
+		val resp = getNetClient(netId, opts.url).sendRequest(opts)
+		return ProtoBuf.encodeToByteArray(resp)
 	}
 
 	@Serializable
-	data class Header(val name: String, val value: String)
+	data class RequestArgs(val netId: String, val opts: RequestOpts)
 
-	@Serializable
-	data class RequestArgs(
-		val method: String,
-		val url: String,
-		val responseType: String?,
-		val sessionId: String?,
-		val requestHeaders: Array<Header>?,
-		val responseHeaders: Array<String>?,
-		val timeout: Long?,
-		val timeoutRetries: Int?,
-		val contentType: String?,
-		val body: ByteArray
-	)
-
-	@Serializable
-	data class Reply(
-		val status: Int,
-		val headers: Array<Header>?,
-		val body: ByteArray
-	)
-
-}
-
-private fun Headers.filterRequested(responseHeaders: Array<String>?): Array<Header>? {
-	if (responseHeaders == null) {
-		return null
-	}
-	val filtered = mutableListOf<Header>()
-	for (hName in responseHeaders) {
-		val hVal = this[hName]
-		if (hVal != null) {
-			filtered.add(Header(hName, hVal))
-		}
-	}
-	return filtered.toTypedArray()
 }
 
 class OpenWebSocketFn(
@@ -145,13 +53,13 @@ class OpenWebSocketFn(
 
 	@OptIn(ExperimentalSerializationApi::class)
 	override suspend fun call(argsBytes: ByteArray): ByteArray {
-		val (url, sessionId) = ProtoBuf.decodeFromByteArray<OpenWSArgs>(argsBytes)
-		val (status, socketId) = sockets.openNew(url, sessionId)
+		val (netId, url, sessionId) = ProtoBuf.decodeFromByteArray<OpenWSArgs>(argsBytes)
+		val (status, socketId) = sockets.openNew(netId, url, sessionId)
 		return ProtoBuf.encodeToByteArray(WSOpeningReply(status, socketId))
 	}
 
 	@Serializable
-	data class OpenWSArgs(val url: String, val sessionId: String)
+	data class OpenWSArgs(val netId: String, val url: String, val sessionId: String)
 
 	@Serializable
 	data class WSOpeningReply(val status: Int, val socketId: Int?)

@@ -107,8 +107,8 @@ export class InitProc {
 
   private async startLogin(): ReturnType<InitProc['launchAppFromAndroid']> {
     await mkdir(this.utilDir, { recursive: true });
-    if (this.userApps) {
-      throw new Error(`Login has already been started, or user is logged in`);
+    if (this.userApps?.coreStarted) {
+      throw new Error(`Login has already been started, and user is logged in`);
     }
     const deferredComponent = defer<ComponentForAndroidAccess>();
     const { enableAutologin, getUserKeyForAutologin, saveUserKey } = autologinFromStartup();
@@ -210,7 +210,7 @@ export class InitProc {
 	}
 
   async launchAppFromAndroid(appDomain: string): Promise<{ connectorId: string; entrypoint: string; }> {
-    if (appDomain == STARTUP_APP_DOMAIN) {
+    if (appDomain === STARTUP_APP_DOMAIN) {
       if (!this.deferredLogin) {
         throw `Login has already been done in this single user setup`;
       }

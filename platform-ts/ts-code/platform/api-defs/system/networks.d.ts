@@ -65,9 +65,9 @@ declare namespace web3n.system.networks {
 		 */
 		testConnection: (opts?: TorProxySetup) => Promise<boolean>;
 
-		currentSetup: () => Promise<TorProxySetup>;
+		currentSetup?: () => Promise<TorProxySetup>;
 
-		setTorProxy: (opts: TorProxySetup) => Promise<void>;
+		setTorProxy?: (opts: TorProxySetup) => Promise<void>;
 
 	}
 

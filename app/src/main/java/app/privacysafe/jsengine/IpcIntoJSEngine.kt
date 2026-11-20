@@ -369,7 +369,7 @@ abstract class CallsIntoJS(
 			) = ProtoBuf.decodeFromByteArray<ReplyWithinCall>(msg)
 			val call = deferredCalls.remove(id)
 			if (call != null) {
-				if ((err == null) || err.isEmpty()) {
+				if (err.isNullOrEmpty()) {
 					call.complete(res)
 				} else {
 					call.completeExceptionally(Exception(err))
@@ -398,7 +398,6 @@ abstract class CallsIntoJS(
 		return ProtoBuf.decodeFromByteArray<TRes>(rep)
 	}
 
-	@OptIn(ExperimentalCoroutinesApi::class)
 	protected inline fun <reified TArgs> callReturningVoid(fnName: String, args: TArgs) {
 		val (id, call) = makeDeferred()
 		val req = ProtoBuf.encodeToByteArray(RequestWithinCallIntoJS(
@@ -415,19 +414,19 @@ abstract class CallsIntoJS(
 		call.asListenableFuture().get()
 	}
 
-	protected inline fun <reified TArgs> callReturningBytes(fnName: String, args: TArgs): ByteArray {
+	protected suspend inline fun <reified TArgs> callReturningBytes(fnName: String, args: TArgs): ByteArray {
 		val (id, call) = makeDeferred()
 		val req = ProtoBuf.encodeToByteArray(
 			RequestWithinCallIntoJS(id, fnName, ProtoBuf.encodeToByteArray(args)
 		))
 		port.send(req)
-		return call.asListenableFuture().get()
+		return call.await()
 	}
 
 	protected fun makeDeferred(): Pair<Int, Deferred<ByteArray>> {
 		val deferred = CompletableDeferred<ByteArray>()
 		var callId = newCallId()
-		while (deferredCalls.get(callId) != null) {
+		while (deferredCalls[callId] != null) {
 			callId = newCallId()
 		}
 		deferredCalls[callId] = deferred

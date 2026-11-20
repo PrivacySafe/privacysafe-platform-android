@@ -151,10 +151,7 @@ class CoreRunnerService : Service() {
 		jsrunner.scope.launch {
 			delay(200.milliseconds)
 			notifications.removeAppNotification(notificationId)
-
-			// TODO
-			jsrunner.notificationClicked(notificationId)
-
+			jsrunner.notificationsCoreFns.notificationClicked(notificationId)
 		}
 	}
 
@@ -262,6 +259,7 @@ class CoreRunnerService : Service() {
 			jsrunner.makeAppGUIComponent(connectorId, appDomain, entrypoint)
 
 			// TODO these should be based on app manifest
+
 			val requiredPermissions = if (appDomain == Bundled.chatDomain) {
 				arrayListOf(Permission.RECORD_AUDIO, Permission.CAMERA)
 			} else { null }

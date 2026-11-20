@@ -29,7 +29,6 @@ export function makeRequestFromAndroid(netId: string): {
   requestFromAndroid: RequestFn<unknown>;
   openServiceEventsSource: NetClient['openEventSource']
 } {
-  exposeWSEventSinkIfNeeded();
   return {
     requestFromAndroid: (
       opts, reqContentType, reqBody
@@ -249,17 +248,12 @@ async function absorbWebSocketEvent({ socketId, event, msg, code, reason }: WebS
   }
 }
 
-let isSinkForWSEventsFromAndroidExposed = false;
-function exposeWSEventSinkIfNeeded() {
-  if (isSinkForWSEventsFromAndroidExposed) {
-    return;
-  }
+export function exposeToAndroidWSEventSink() {
   fnsForAndroid.exposeFn(
     absorbWebSocketEvent,
     ProtoType.for<WebSocketEvent>(pb.WebSocketEvent),
     undefined
   );
-  isSinkForWSEventsFromAndroidExposed = true;
 }
 
 async function openServiceEventsSource(netId: string, req: RequestOpts): ReturnType<OpenServiceEventsSource> {

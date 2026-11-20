@@ -34,7 +34,6 @@ import { makeConnectivity } from "./caps/connectivity";
 import { fnsForAndroid } from "./runtime-ipc-via-ports";
 import { init as pb } from '../protos/init.proto';
 import { ProtoType } from "../../platform/lib-common/protobuf-msg";
-import { exposeInitProcFns } from "./exposing-fns-to-android";
 import { ConnectorsAndComponents } from "../app-n-components/connectors-on-core-side";
 import { UserLogin } from "./caps/user-login";
 import { makeAutoStartupCAP } from "./caps/user-login/auto-startup";
@@ -42,8 +41,9 @@ import { PlatformResources } from "../../platform/inject-defs/platform";
 import { Logging } from "../../platform/inject-defs/confs";
 import { hashing } from 'ecma-nacl';
 import { makeHybridCryptor } from "./hybrid-cryptor/from-android-and-in-proc-wasm";
-import { makeOpenURLCAP } from "./caps/openers";
-import { notificationsMaker } from "./caps/user-notifications";
+import { makeOpenFileCAP, makeOpenURLCAP, openInMountedFolderCAP } from "./caps/shell/openers";
+import { notificationsMaker } from "./caps/shell/user-notifications";
+import { makeMountsCAP } from "./caps/shell/mounts";
 // import { makeInProcessWasmCryptor } from "ecma-nacl-cryptors";
 // import { scanUrlQR } from "./caps/scan-qr";
 
@@ -54,9 +54,13 @@ import { notificationsMaker } from "./caps/user-notifications";
     return (hashing.sha512.hash(bytes) as any).toBase64();
   }
 
-  function makePlatformResources(logging: Logging): PlatformResources {
+  function makePlatformResources(logging: Logging): {
+    r: PlatformResources;
+    exposeFnsToAndroid: () => void;
+   } {
 
-    const { makeNetClient, makeServiceLocator, networks } = makeNetworksParts();
+    const { makeNetClient, makeServiceLocator, networks, exposeNetworkFnsToAndroid } = makeNetworksParts();
+    const { makeNotifications, exposeNotificationFnsToAndroid } = notificationsMaker(logging.logError);
 
     function clearLogsDirAndScheduleNextCleanup() {
       logging.removeOlderLogs();
@@ -65,40 +69,46 @@ import { notificationsMaker } from "./caps/user-notifications";
     clearLogsDirAndScheduleNextCleanup();
 
     return {
-      caps: {
-        makeAppDownloader: sysPlaces => new AppDownloader(
-          sysPlaces, makeServiceLocator('w3nApp', logging.logError), makeNetClient(), sha512
+      r: {
+        caps: {
+          makeAppDownloader: sysPlaces => new AppDownloader(
+            sysPlaces, makeServiceLocator('w3nApp', logging.logError), makeNetClient(), sha512
+          ),
+          makeAutoStartupCAP,
+          makeSystemPlaces: storages => makeSystemPlaces(storages, logging.logError),
+          makeUICap,
+          makeMediaDevicesCAP: undefined,
+          makeConnectivity,
+          makeNetworks: () => networks,
+          shell: {
+            makeClipboardCAP: undefined,
+            makeOpenFileCAP,
+            makeOpenFolderCAP: undefined,
+            makeOpenURLCAP,
+            openInMountedFolderCAP,
+            makeMountsCAP,
+            makeNotifications,
+            // scanUrlQR
+          }
+        },
+        LAUNCHER_APP_DOMAIN,
+        logging,
+        makeCryptor: makeHybridCryptor,
+        random: makeRandom(),
+        makeNetClient,
+        makeServiceLocator,
+        makeUserLogin: (userId, getKeyFromPass) => UserLogin.make(
+          logging.logError, userId, getKeyFromPass
         ),
-        makeAutoStartupCAP,
-        makeSystemPlaces: storages => makeSystemPlaces(storages, logging.logError),
-        makeUICap,
-        makeMediaDevicesCAP: undefined,
-        makeConnectivity,
-  			makeNetworks: () => networks,
-        shell: {
-          makeClipboardCAP: undefined,
-          makeOpenFileCAP: undefined,
-          makeOpenFolderCAP: undefined,
-          makeOpenURLCAP,
-          openInMountedFolderCAP: undefined,
-          makeMountsCAP: undefined,
-          makeNotifications: notificationsMaker(logging.logError),
-          // scanUrlQR
-        }
+        showSystemErrorBox,
+        getServiceForCAP: undefined,
+        getSytemFormFactor: deviceFormFactor,
+        sysFilesOnDevice
       },
-      LAUNCHER_APP_DOMAIN,
-      logging,
-      makeCryptor: makeHybridCryptor,
-      random: makeRandom(),
-      makeNetClient,
-      makeServiceLocator,
-      makeUserLogin: (userId, getKeyFromPass) => UserLogin.make(
-        logging.logError, userId, getKeyFromPass
-      ),
-      showSystemErrorBox,
-      getServiceForCAP: undefined,
-      getSytemFormFactor: deviceFormFactor,
-      sysFilesOnDevice
+      exposeFnsToAndroid: () => {
+        exposeNetworkFnsToAndroid();
+        exposeNotificationFnsToAndroid();
+      }
     };
   }
 
@@ -113,6 +123,7 @@ import { notificationsMaker } from "./caps/user-notifications";
     const logging = loggerToFileAndConsole(utilDir);
 
     const connectors = new ConnectorsAndComponents();
+    const { r, exposeFnsToAndroid } = makePlatformResources(logging);
 
     const initProc = new InitProc(
       makeCoreDriver,
@@ -121,13 +132,14 @@ import { notificationsMaker } from "./caps/user-notifications";
         dataDir,
         signUpUrl: SIGNUP_URL
       },
-      makePlatformResources(logging),
+      r,
       utilDir,
       platformVersion,
       logging
     );
 
-    exposeInitProcFns(initProc);
+    exposeFnsToAndroid();
+    initProc.exposeFnsToAndroid();
 
   }
   interface DataDirArgs { dataDir: string; platformVersion: string; }

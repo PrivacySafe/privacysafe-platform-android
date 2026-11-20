@@ -62,6 +62,14 @@
 			android:exported="false"
 			android:foregroundServiceType="remoteMessaging" />
 
+		<provider
+			android:authorities="app.privacysafe.fs"
+			android:name="app.privacysafe.MountedFilesProvider"
+			android:exported="false"
+			android:grantUriPermissions="true"
+			tools:ignore="ExportedContentProvider">
+		</provider>
+
 		<activity
 			android:name=".InitActivity"
 			android:exported="true"

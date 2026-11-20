@@ -34,6 +34,7 @@ import app.privacysafe.TorProxy
 import app.privacysafe.utils.execBlocking
 import app.privacysafe.jsengine.ops.DisconnectFromCoreOp
 import app.privacysafe.jsengine.ops.ListCoreObjPathOp
+import app.privacysafe.provideCoreFnsToMountedFsProvider
 import app.privacysafe.utils.appDataDir
 import app.privacysafe.utils.migrateDataIfAnyOldPresent
 import app.privacysafe.utils.readToString
@@ -100,14 +101,16 @@ class JSRunner(
 					makeAndConfigureNewIsolate(jsHas), jsHas,
 					makeCoreInjectedFns(
 						uiFns, torProxy, { core.coreFns },
-						Path(appDataDir), ctx.utilAndroidDir(), assets,
+						Path(appDataDir), ctx,
 						Executors.newFixedThreadPool(NUM_OF_CRYPTOR_THREADS),
 						notifications
 					),
 					assets, executor, scope, appDataDir,
-					ctx.packageManager.getPackageInfo(ctx.packageName, 0).versionName!!
+					ctx.packageManager.getPackageInfo(ctx.packageName, 0).versionName!!,
+					"content://${ctx.packageName}.fs/"
 				)
 				whenCoreSet!!.complete(core)
+				provideCoreFnsToMountedFsProvider(core.coreFns.mounts)
 				whenCoreSet = null
 			} catch (err: Throwable) {
 				Log.e("w3n", "JSRunner.runner initialization error: \n${err.stackTraceToString()}")
@@ -200,16 +203,8 @@ class JSRunner(
 		}
 	}
 
-	fun notificationClicked(notificationId: Int) {
-		scope.launch {
-			core.coreFns.notificationClicked(notificationId)
-		}
-	}
-
-	fun notificationDismissed(notificationId: Int) {
-		scope.launch {
-			core.coreFns.notificationDismissed(notificationId)
-		}
+	val notificationsCoreFns get(): CallsIntoCore.NotificationsFns {
+		return core.coreFns.notifications
 	}
 
 	abstract inner class ComponentConnector(

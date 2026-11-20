@@ -51,7 +51,9 @@ import kotlin.concurrent.atomics.AtomicInt
 import kotlin.concurrent.atomics.ExperimentalAtomicApi
 import kotlin.time.Duration.Companion.seconds
 
-fun makeNetworksParts(torProxy: TorProxy, coreFns: () -> CallsIntoCore): Pair<GetNetClient, WebSockets> {
+fun makeNetworksParts(
+	torProxy: TorProxy, coreFns: () -> CallsIntoCore.WebSocketFns
+): Pair<GetNetClient, WebSockets> {
 
 	var regular = makeClientForRegularNetwork()
 	var onion: OkHttpClient? = null
@@ -91,7 +93,7 @@ private const val CLIENT_SIDE_PING_PERIOD_SECS: Long = 10;
 
 @OptIn(ExperimentalAtomicApi::class)
 class WebSockets (
-	private val coreFns: () -> CallsIntoCore,
+	private val coreFns: () -> CallsIntoCore.WebSocketFns,
 	private val getNetClient: GetNetClient
 ) {
 

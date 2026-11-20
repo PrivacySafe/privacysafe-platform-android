@@ -17,13 +17,13 @@
 
 import { Subject } from 'rxjs';
 import { share } from 'rxjs/operators';
-import { toRxObserver } from '../../../platform/lib-common/utils-for-observables';
-import { Notifications as NotificationsType } from "../../../platform/caps/shell/user-notifications";
-import { fnsForAndroid, wrapFnOnAndroidSide } from '../runtime-ipc-via-ports';
-import { notifications_op as pb } from "../../protos/notifications-op.proto";
-import { ProtoType } from '../../../platform/lib-common/protobuf-msg';
-import { ShellCAPs } from '../../../platform/inject-defs/caps';
-import { Logging } from '../../../platform/inject-defs/confs';
+import { toRxObserver } from '../../../../platform/lib-common/utils-for-observables';
+import { Notifications as NotificationsType } from "../../../../platform/caps/shell/user-notifications";
+import { fnsForAndroid, wrapFnOnAndroidSide } from '../../runtime-ipc-via-ports';
+import { notifications_op as pb } from "../../../protos/notifications-op.proto";
+import { ProtoType } from '../../../../platform/lib-common/protobuf-msg';
+import { ShellCAPs } from '../../../../platform/inject-defs/caps';
+import { Logging } from '../../../../platform/inject-defs/confs';
 
 type UserNotifications = web3n.shell.notifications.UserNotifications;
 type NotificationOpts = web3n.shell.notifications.NotificationOpts;
@@ -238,30 +238,40 @@ Object.freeze(AppNotifications);
 
 function noop() {}
 
-export function notificationsMaker(logError: Logging['logError']): NonNullable<ShellCAPs['makeNotifications']> {
+export function notificationsMaker(logError: Logging['logError']): {
+	makeNotifications: NonNullable<ShellCAPs['makeNotifications']>;
+	exposeNotificationFnsToAndroid: () => void;
+ } {
 	let notifications: Notifications|undefined = undefined;
 
-	async function notificationClicked({ id }: NotificationId) {
-		notifications?.notificationClicked(id);
-	}
-	fnsForAndroid.exposeFn(
-		notificationClicked,
-		ProtoType.for<NotificationId>(pb.NotificationId),
-		undefined
-	);
+	function exposeNotificationFnsToAndroid() {
 
-	async function notificationDismissed({ id }: NotificationId) {
-		notifications?.notificationDismissed(id);
-	}
-	fnsForAndroid.exposeFn(
-		notificationDismissed,
-		ProtoType.for<NotificationId>(pb.NotificationId),
-		undefined
-	);
+		async function notificationClicked({ id }: NotificationId) {
+			notifications?.notificationClicked(id);
+		}
+		fnsForAndroid.exposeFn(
+			notificationClicked,
+			ProtoType.for<NotificationId>(pb.NotificationId),
+			undefined
+		);
 
-	return triggerCmd => {
-		notifications = new Notifications(triggerCmd, logError);
-		return notifications;
+		async function notificationDismissed({ id }: NotificationId) {
+			notifications?.notificationDismissed(id);
+		}
+		fnsForAndroid.exposeFn(
+			notificationDismissed,
+			ProtoType.for<NotificationId>(pb.NotificationId),
+			undefined
+		);
+
+	}
+
+	return {
+		makeNotifications: triggerCmd => {
+			notifications = new Notifications(triggerCmd, logError);
+			return notifications;
+		},
+		exposeNotificationFnsToAndroid
 	};
 }
 

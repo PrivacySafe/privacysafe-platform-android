@@ -18,17 +18,20 @@ package app.privacysafe.jsengine
 
 import android.annotation.SuppressLint
 import android.content.res.AssetManager
+import android.net.Uri
+import android.os.ParcelFileDescriptor
 import android.util.Log
 import androidx.javascriptengine.JavaScriptConsoleCallback.ConsoleMessage
 import androidx.javascriptengine.JavaScriptIsolate
 import androidx.javascriptengine.TerminationInfo
-import app.privacysafe.utils.appDataDir
 import app.privacysafe.utils.execBlocking
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.Serializable
 import okhttp3.Response
+import okio.IOException
 import java.io.FileNotFoundException
 import java.io.InputStream
 import java.util.Objects
@@ -43,10 +46,11 @@ class CoreRunner(
 	executor: ThreadPoolExecutor,
 	scope: CoroutineScope,
 	appDataDir: String,
-	androidAppVersion: String
+	androidAppVersion: String,
+	fsMountURIPrefix: String
 ) : IpcIntoJSEngine(js, jsHas, executor, scope, assets) {
 
-	val coreFns = CallsIntoCore() { portName, listener ->
+	val coreFns = CallsIntoCore(fsMountURIPrefix) { portName, listener ->
 		makeMsgPassingPort(portName, listener)
 	}
 
@@ -83,9 +87,14 @@ class CoreRunner(
 }
 
 class CallsIntoCore (
+	fsMountURIPrefix: String,
 	makeMsgPassingPort: (portName: String, listener: (msg: ByteArray) -> Unit) -> MsgPassingPort
 ) : CallsIntoJS(makeMsgPassingPort) {
 	private val ioScope = CoroutineScope(Dispatchers.IO)
+
+	val ws = WebSocketFns()
+	val notifications = NotificationsFns()
+	val mounts = MountedFsFns(fsMountURIPrefix)
 
 	fun init(dataDir: String, platformVersion: String) {
 		callReturningVoid("init", DataDirArgs(dataDir, platformVersion))
@@ -105,7 +114,6 @@ class CallsIntoCore (
 		callReturningVoid("onComponentClosedInAndroid", ConnectorIdArgs(connectorId))
 	}
 
-	@OptIn(ExperimentalSerializationApi::class)
 	fun listObjPathInConnector(connectorId: String, objPath: Array<String>): Array<String> {
 		return ioScope.execBlocking {
 			callWithReturned<ConnectorAndObjPathArgs, StringArrayValue>(
@@ -148,7 +156,6 @@ class CallsIntoCore (
 		return hash.ifEmpty { null }
 	}
 
-	@OptIn(ExperimentalSerializationApi::class)
 	private fun getFileSizeInAppCodeFS(connectorId: String, path: String): Int {
 		return ioScope.execBlocking {
 			val size = try {
@@ -192,7 +199,7 @@ class CallsIntoCore (
 	fun streamBytesFromAppCodeFS(connectorId: String, path: String): InputStream {
 		val size = getFileSizeInAppCodeFS(connectorId, path)
 		try {
-			return StreamFromAppCodeFS(size) { start, end ->
+			return SourceOfByteFromCore(size) { start, end ->
 				readBytesFromFileInAppCodeFS(connectorId, path, start, end)
 			}
 		} catch (err: Throwable) {
@@ -200,20 +207,114 @@ class CallsIntoCore (
 		}
 	}
 
-	fun notificationClicked(notificationId: Int) {
-		callReturningVoid("notificationClicked", NotificationId(notificationId))
+	inner class MountedFsFns(
+		val fsMountURIPrefix: String
+	) {
+
+		fun pathFromContentURI(contentURI: Uri): String? {
+			val str = contentURI.toString()
+			return if (str.startsWith(fsMountURIPrefix)) {
+				val path = str.substring(fsMountURIPrefix.length)
+				path
+			} else {
+				null
+			}
+		}
+
+		fun statItemInMountedFS(path: String): FsItemStats? {
+			return ioScope.execBlocking {
+				try {
+					statItem(path)
+				} catch (err: Throwable) {
+					null
+				}
+			}
+		}
+
+		private suspend fun statItem(path: String): FsItemStats {
+			return callWithReturned<StringValue, FsItemStats>("statItemInMountedFS", StringValue(path))
+		}
+
+		private suspend fun readBytesFromFileInMountedFS(path: String, start: Int, end: Int): ByteArray {
+			return callReturningBytes("readBytesFromFileInMountedFS", MountedFileReadArgs(path, start, end))
+		}
+
+		fun pumpBytesFromFileInMountedFS(path: String): ParcelFileDescriptor {
+			return ioScope.execBlocking {
+				try {
+					val stats = statItem(path)
+					val pipe = ParcelFileDescriptor.createPipe()
+					val sink = ParcelFileDescriptor.AutoCloseOutputStream(pipe[1])
+					ioScope.launch {
+						try {
+							var ofs = 0
+							while (ofs < stats.size) {
+								val chunk = readBytesFromFileInMountedFS(
+									path, ofs, ofs + (stats.size - ofs).coerceAtMost(FILE_READING_CHUNK_SIZE)
+								)
+								sink.write(chunk)
+								ofs += chunk.size
+							}
+							sink.close()
+						} catch (err: Throwable) {
+							sink.close()
+						}
+					}
+					pipe[0]
+				} catch (err: IOException) {
+					throw err
+				} catch (err: Throwable) {
+					throw IOException("Fail to read bytes from $path", err)
+				}
+			}
+		}
+
 	}
 
-	fun notificationDismissed(notificationId: Int) {
-		callReturningVoid("notificationDismissed", NotificationId(notificationId))
+	@Serializable
+	data class FsItemStats(val name: String, val isFile: Boolean, val size: Int)
+
+	@Serializable
+	data class MountedFileReadArgs(val name: String, val start: Int, val end: Int)
+
+	inner class NotificationsFns {
+
+		fun notificationClicked(notificationId: Int) {
+			callReturningVoid("notificationClicked", NotificationId(notificationId))
+		}
+
+		fun notificationDismissed(notificationId: Int) {
+			callReturningVoid("notificationDismissed", NotificationId(notificationId))
+		}
 
 	}
 
 	@Serializable
 	data class NotificationId(val id: Int)
 
-	private fun absorbWebSocketEvent(event: WebSocketEvent) {
-		callReturningVoid("absorbWebSocketEvent", event)
+	inner class WebSocketFns {
+
+		private fun absorbWebSocketEvent(event: WebSocketEvent) {
+			this@CallsIntoCore.callReturningVoid("absorbWebSocketEvent", event)
+		}
+
+		fun passMsgInWebSocket(socketId: Int, msg: String) {
+			absorbWebSocketEvent(WebSocketEvent(socketId, WS_MSG_EVENT, msg, null, null))
+		}
+
+		fun pongInWebSocket(socketId: Int) {
+			absorbWebSocketEvent(WebSocketEvent(socketId, PONG_WS_EVENT, null, null, null))
+		}
+
+		fun signalWebSocketClosing(socketId: Int, code: Int, reason: String) {
+			absorbWebSocketEvent(WebSocketEvent(socketId, CLOSED_WS_EVENT, null, code, reason))
+		}
+
+		fun signalWebSocketFailed(socketId: Int, t: Throwable, response: Response?) {
+			val reason = response?.message ?: t.message ?: t.stackTrace.joinToString("\n")
+			absorbWebSocketEvent(WebSocketEvent(socketId, FAILED_WS_EVENT, null, 4500, reason))
+		}
+
 	}
 
 	@Serializable
@@ -221,24 +322,9 @@ class CallsIntoCore (
 		val socketId: Int, val event: String, val msg: String?, val code: Int?, val reason: String?
 	)
 
-	fun passMsgInWebSocket(socketId: Int, msg: String) {
-		absorbWebSocketEvent(WebSocketEvent(socketId, WS_MSG_EVENT, msg, null, null))
-	}
-
-	fun pongInWebSocket(socketId: Int) {
-		absorbWebSocketEvent(WebSocketEvent(socketId, PONG_WS_EVENT, null, null, null))
-	}
-
-	fun signalWebSocketClosing(socketId: Int, code: Int, reason: String) {
-		absorbWebSocketEvent(WebSocketEvent(socketId, CLOSED_WS_EVENT, null, code, reason))
-	}
-
-	fun signalWebSocketFailed(socketId: Int, t: Throwable, response: Response?) {
-		val reason = response?.message ?: t.message ?: t.stackTrace.joinToString("\n")
-		absorbWebSocketEvent(WebSocketEvent(socketId, FAILED_WS_EVENT, null, 4500, reason))
-	}
-
 }
+
+private const val FILE_READING_CHUNK_SIZE = 256*1024
 
 private const val WS_MSG_EVENT = "msg"
 private const val PONG_WS_EVENT = "pong"
@@ -247,7 +333,7 @@ private const val FAILED_WS_EVENT = "failed"
 
 private const val BUFFER_SIZE_TO_READ_CODE = 128*1024
 
-private class StreamFromAppCodeFS(
+private class SourceOfByteFromCore(
 	private val size: Int,
 	private val readBytesFromJS: (start: Int, end: Int) -> ByteArray?,
 ) : InputStream() {

@@ -19,7 +19,7 @@ import { dohAt } from 'core-3nweb-client-lib';
 import { DnsResolver, wrapNetworkFns } from 'core-3nweb-client-lib/build/lib-client/networks';
 import { dohURLs } from './confs';
 import { OpenServiceEventsSource, RequestFn } from 'core-3nweb-client-lib/build/lib-client/request-utils';
-import { makeRequestFromAndroid } from './ops/request';
+import { exposeToAndroidWSEventSink, makeRequestFromAndroid } from './ops/request';
 
 type Networks = web3n.system.networks.Networks;
 type DnsAndIP = web3n.system.networks.DnsAndIP;
@@ -183,7 +183,12 @@ export function makeNetworksParts() {
 		}
 	});
 
-	return { makeNetClient, makeServiceLocator, networks };
+	return {
+		makeNetClient, makeServiceLocator, networks,
+		exposeNetworkFnsToAndroid: () => {
+			exposeToAndroidWSEventSink();
+		}
+	};
 }
 
 

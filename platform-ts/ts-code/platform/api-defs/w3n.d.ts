@@ -45,6 +45,8 @@ declare namespace web3n.caps {
 		 */
 		closeSelf: () => void;
 
+		// watchLifecycle: (obs: Observer<LifecycleEvent>) => (() => void);
+
 		/**
 		 * myVersion returns version of current app.
 		 */
@@ -52,16 +54,15 @@ declare namespace web3n.caps {
 
 		ui: ui.UI;
 
-		// idea for lifecycle methods
-		// lifecycle: {
-		//   addListener: (event, hook) => void;
-		// };
-
 		shell?: shell.ShellCAPs;
 		rpc?: rpc.RPC;
 		connectivity?: connectivity.Connectivity;
 		mediaDevices?: media.MediaDevices;
 
+	}
+
+	interface LifecycleEvent {
+		type: 'ipc-disconnect' | 'closing';
 	}
 
 }

@@ -26,12 +26,17 @@ export function urlFitsFilter({
 		if (subdomains) {
 			for (const subd of subdomains) {
 				const sections = subd.split('.');
+				let fits: boolean;
 				if (sections[0] === '*') {
-					return url.hostname.endsWith(`${
+					const allowedTail = `${
 						(sections.length === 1) ? '' : `.${sections.slice(1).join('.')}`
-					}.${domain}`);
+					}.${domain}`
+					fits = url.hostname.endsWith(allowedTail);
 				} else {
-					return (url.hostname === `${subd}.${domain}`);
+					fits = (url.hostname === `${subd}.${domain}`);
+				}
+				if (fits) {
+					return true
 				}
 			}
 		} else {

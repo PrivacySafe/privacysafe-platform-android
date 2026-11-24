@@ -69,12 +69,20 @@ fun makeNetworksParts(
 					onionDeferred!!.await()
 				} else {
 					onionDeferred = CompletableDeferred()
-					if (!torProxy.isStarted) {
-						torProxy.startService()
-						torProxy.whenConnected()
+					try {
+						if (!torProxy.isStarted) {
+							torProxy.startService()
+							torProxy.whenConnected()
+						}
+						onion = makeClientProxyingRegularNetwork("localhost", torProxy.socksPort!!)
+						onionDeferred!!.complete(onion)
+						onion
+					} catch (err: Throwable) {
+						onionDeferred!!.completeExceptionally(err)
+						throw err
+					} finally {
+						onionDeferred = null
 					}
-					onion = makeClientProxyingRegularNetwork("localhost", torProxy.socksPort!!)
-					onion
 				}
 			}
 			else -> throw Error("$netId is unknown")

@@ -299,10 +299,13 @@ class JSRunner(
 	}
 
 	fun stopDenoComponent(connectorId: String) {
-		val c = components.find(connectorId)
-		if (c is AppComponentConnector) {
-			c.disconnectAndStopJSEngine()
-			components.remove(c)
+		scope.launch {
+			delay(10.milliseconds)
+			val c = components.find(connectorId)
+			if (c is AppComponentConnector) {
+				c.disconnectAndStopJSEngine()
+				components.remove(c)
+			}
 		}
 	}
 
